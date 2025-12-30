@@ -74,6 +74,21 @@ Error: Your project's URL and Key are required to create a Supabase client!
 
 Isso significa que as variáveis de ambiente não foram configuradas no Vercel. Configure-as conforme acima e faça um novo deploy.
 
+## ⚠️ Erro sobre routes-manifest.json
+
+Se você ver o erro:
+```
+Error: The file "/vercel/path0/routes-manifest.json" couldn't be found
+```
+
+Mas o build foi concluído com sucesso (você vê "✓ Compiled successfully" e "✓ Generating static pages"), isso pode ser um bug conhecido do Vercel. O deploy pode ainda funcionar corretamente.
+
+**Para verificar:**
+1. Acesse o dashboard do Vercel
+2. Verifique se o deployment foi marcado como "Failed" ou "Ready"
+3. Se estiver como "Ready", o deploy funcionou apesar do erro
+4. Se estiver como "Failed", tente fazer um redeploy
+
 ## 🐛 Se o problema persistir
 
 1. Tente deletar o projeto no Vercel e recriar
@@ -82,4 +97,5 @@ Isso significa que as variáveis de ambiente não foram configuradas no Vercel. 
    npm i -g vercel
    vercel
    ```
+3. Verifique se a versão do Node.js no Vercel está compatível (recomendado: Node.js 18 ou 20)
 

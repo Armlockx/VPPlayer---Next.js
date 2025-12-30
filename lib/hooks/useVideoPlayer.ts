@@ -198,7 +198,7 @@ export function useVideoPlayer() {
     currentTrackingVideoIdRef.current = videoId;
     lastWatchTimeUpdateRef.current = Date.now();
 
-    // Atualizar watch_time a cada 10 segundos
+    // Atualizar watch_time a cada 5 segundos
     watchTimeIntervalRef.current = setInterval(() => {
       const video = videoRef.current;
       if (!video) return;
@@ -208,31 +208,41 @@ export function useVideoPlayer() {
         const now = Date.now();
         const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
 
-        // Atualizar se passaram pelo menos 10 segundos
-        if (elapsedSeconds >= 10) {
+        // Atualizar se passaram pelo menos 5 segundos
+        if (elapsedSeconds >= 5) {
           incrementWatchTime(videoId, elapsedSeconds).catch((error) => {
             console.error('Erro ao incrementar watch_time no intervalo:', error);
           });
           lastWatchTimeUpdateRef.current = now;
         }
       }
-    }, 10000); // Verificar a cada 10 segundos
+    }, 5000); // Verificar a cada 5 segundos
+  }, [incrementWatchTime]);
+
+  // Função auxiliar para salvar tempo assistido
+  const saveWatchTime = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || !currentTrackingVideoIdRef.current) return;
+
+    const now = Date.now();
+    const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+    
+    // Salvar se tiver pelo menos 0.1 segundos (para evitar salvar valores muito pequenos)
+    if (elapsedSeconds > 0.1) {
+      try {
+        await incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds);
+        lastWatchTimeUpdateRef.current = now;
+      } catch (error) {
+        console.error('Erro ao salvar watch_time:', error);
+      }
+    }
   }, [incrementWatchTime]);
 
   // Parar rastreamento de watch_time
   const stopWatchTimeTracking = useCallback((saveRemainingTime: boolean = true) => {
     // Salvar tempo restante antes de parar (se solicitado)
     if (saveRemainingTime) {
-      const video = videoRef.current;
-      if (video && !video.paused && !video.ended && currentTrackingVideoIdRef.current) {
-        const now = Date.now();
-        const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
-        if (elapsedSeconds > 0.5) { // Só salvar se tiver pelo menos 0.5 segundos
-          incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds).catch((error) => {
-            console.error('Erro ao salvar tempo restante:', error);
-          });
-        }
-      }
+      saveWatchTime();
     }
 
     if (watchTimeIntervalRef.current) {
@@ -241,7 +251,7 @@ export function useVideoPlayer() {
     }
 
     currentTrackingVideoIdRef.current = null;
-  }, [incrementWatchTime]);
+  }, [saveWatchTime]);
 
   const nextVideo = useCallback(() => {
     if (currentVideoIndex < videos.length - 1) {
@@ -311,20 +321,8 @@ export function useVideoPlayer() {
     };
     const handlePause = () => {
       setIsPlaying(false);
-      // Salvar o tempo assistido até agora, mas manter o rastreamento ativo
-      // O intervalo continuará rodando, mas não incrementará enquanto pausado
-      const video = videoRef.current;
-      if (video && currentTrackingVideoIdRef.current) {
-        const now = Date.now();
-        const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
-        if (elapsedSeconds > 0.5) {
-          incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds).catch((error) => {
-            console.error('Erro ao salvar tempo ao pausar:', error);
-          });
-        }
-        // Atualizar o timestamp para que quando retomar, comece do zero novamente
-        lastWatchTimeUpdateRef.current = now;
-      }
+      // Salvar o tempo assistido quando pausa (mesmo que seja menos de 5 segundos)
+      saveWatchTime();
     };
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
@@ -357,9 +355,9 @@ export function useVideoPlayer() {
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('progress', handleProgress);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      stopWatchTimeTracking();
+      stopWatchTimeTracking(true); // Salvar tempo ao desmontar
     };
-  }, [videos, currentVideoIndex, incrementViews, startWatchTimeTracking, stopWatchTimeTracking]);
+  }, [videos, currentVideoIndex, incrementViews, startWatchTimeTracking, stopWatchTimeTracking, saveWatchTime]);
 
   // Parar e salvar rastreamento quando o vídeo muda
   useEffect(() => {
@@ -369,14 +367,53 @@ export function useVideoPlayer() {
     };
   }, [currentVideoIndex, stopWatchTimeTracking]);
 
+  // Salvar watch_time quando sair da página (beforeunload) ou aba ficar oculta
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Salvar tempo assistido ao sair da página (não podemos esperar pela promise)
+      const video = videoRef.current;
+      if (!video || !currentTrackingVideoIdRef.current) return;
+
+      const now = Date.now();
+      const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+      
+      if (elapsedSeconds > 0.1) {
+        const videoId = currentTrackingVideoIdRef.current;
+        // Fazer chamada direta sem esperar resposta (fire and forget)
+        incrementWatchTime(videoId, elapsedSeconds).catch(() => {
+          // Ignorar erros ao sair da página
+        });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // Salvar quando a aba ficar oculta (pode aguardar a promise)
+      if (document.hidden) {
+        saveWatchTime();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Também salvar ao desmontar o componente
+      saveWatchTime();
+    };
+  }, [saveWatchTime, incrementWatchTime]);
+
   // Limpar intervalo quando componente desmontar
   useEffect(() => {
     return () => {
       if (watchTimeIntervalRef.current) {
         clearInterval(watchTimeIntervalRef.current);
       }
+      // Salvar tempo restante ao desmontar
+      saveWatchTime();
     };
-  }, []);
+  }, [saveWatchTime]);
 
   // Controles automáticos (esconder após inatividade)
   const resetControlsTimeout = useCallback(() => {

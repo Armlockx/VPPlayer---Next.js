@@ -201,12 +201,18 @@ export function useVideoPlayer() {
     // Atualizar watch_time a cada 10 segundos
     watchTimeIntervalRef.current = setInterval(() => {
       const video = videoRef.current;
-      if (video && !video.paused && currentTrackingVideoIdRef.current === videoId) {
+      if (!video) return;
+
+      // Verificar se ainda estamos rastreando o mesmo vídeo e se está tocando
+      if (currentTrackingVideoIdRef.current === videoId && !video.paused && !video.ended) {
         const now = Date.now();
         const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
 
+        // Atualizar se passaram pelo menos 10 segundos
         if (elapsedSeconds >= 10) {
-          incrementWatchTime(videoId, elapsedSeconds);
+          incrementWatchTime(videoId, elapsedSeconds).catch((error) => {
+            console.error('Erro ao incrementar watch_time no intervalo:', error);
+          });
           lastWatchTimeUpdateRef.current = now;
         }
       }
@@ -214,20 +220,24 @@ export function useVideoPlayer() {
   }, [incrementWatchTime]);
 
   // Parar rastreamento de watch_time
-  const stopWatchTimeTracking = useCallback(() => {
+  const stopWatchTimeTracking = useCallback((saveRemainingTime: boolean = true) => {
+    // Salvar tempo restante antes de parar (se solicitado)
+    if (saveRemainingTime) {
+      const video = videoRef.current;
+      if (video && !video.paused && !video.ended && currentTrackingVideoIdRef.current) {
+        const now = Date.now();
+        const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+        if (elapsedSeconds > 0.5) { // Só salvar se tiver pelo menos 0.5 segundos
+          incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds).catch((error) => {
+            console.error('Erro ao salvar tempo restante:', error);
+          });
+        }
+      }
+    }
+
     if (watchTimeIntervalRef.current) {
       clearInterval(watchTimeIntervalRef.current);
       watchTimeIntervalRef.current = null;
-    }
-
-    // Salvar tempo restante antes de parar
-    const video = videoRef.current;
-    if (video && !video.paused && currentTrackingVideoIdRef.current) {
-      const now = Date.now();
-      const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
-      if (elapsedSeconds > 0) {
-        incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds);
-      }
     }
 
     currentTrackingVideoIdRef.current = null;
@@ -289,13 +299,32 @@ export function useVideoPlayer() {
           incrementViews(currentVideo.id);
         }
 
-        // Iniciar rastreamento de watch_time
-        startWatchTimeTracking(currentVideo.id);
+        // Se já estava rastreando este vídeo, apenas atualizar o timestamp
+        // Caso contrário, iniciar novo rastreamento
+        if (currentTrackingVideoIdRef.current !== currentVideo.id) {
+          startWatchTimeTracking(currentVideo.id);
+        } else {
+          // Continuar rastreamento, apenas atualizar timestamp
+          lastWatchTimeUpdateRef.current = Date.now();
+        }
       }
     };
     const handlePause = () => {
       setIsPlaying(false);
-      stopWatchTimeTracking();
+      // Salvar o tempo assistido até agora, mas manter o rastreamento ativo
+      // O intervalo continuará rodando, mas não incrementará enquanto pausado
+      const video = videoRef.current;
+      if (video && currentTrackingVideoIdRef.current) {
+        const now = Date.now();
+        const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+        if (elapsedSeconds > 0.5) {
+          incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds).catch((error) => {
+            console.error('Erro ao salvar tempo ao pausar:', error);
+          });
+        }
+        // Atualizar o timestamp para que quando retomar, comece do zero novamente
+        lastWatchTimeUpdateRef.current = now;
+      }
     };
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
@@ -332,10 +361,11 @@ export function useVideoPlayer() {
     };
   }, [videos, currentVideoIndex, incrementViews, startWatchTimeTracking, stopWatchTimeTracking]);
 
-  // Parar rastreamento quando o vídeo muda
+  // Parar e salvar rastreamento quando o vídeo muda
   useEffect(() => {
+    // Quando o vídeo muda, salvar o tempo do vídeo anterior
     return () => {
-      stopWatchTimeTracking();
+      stopWatchTimeTracking(true); // Salvar tempo restante
     };
   }, [currentVideoIndex, stopWatchTimeTracking]);
 

@@ -164,7 +164,6 @@ export function VideoQueue({
               width: '36px',
               height: '36px',
               padding: 0,
-              border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
               display: 'flex',

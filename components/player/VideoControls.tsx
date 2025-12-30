@@ -19,11 +19,24 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
   const { comments } = useComments(player.currentVideo?.id || null);
   const [commentsModalOpen, setCommentsModalOpen] = useState(false);
 
-  const handleLikeClick = () => {
-    if (isGuest && onAuthRequired) {
-      onAuthRequired();
-    } else {
-      likes.toggleLike();
+  const handleLikeClick = async () => {
+    // Se for guest, mostrar modal de login
+    if (isGuest) {
+      if (onAuthRequired) {
+        onAuthRequired();
+      }
+      return;
+    }
+
+    // Tentar fazer like - se não estiver autenticado, o hook mostrará o modal
+    // Mas vamos verificar antes para ter melhor controle
+    try {
+      await likes.toggleLike();
+    } catch (error) {
+      // Se houver erro e for por falta de autenticação, mostrar modal
+      if (onAuthRequired) {
+        onAuthRequired();
+      }
     }
   };
 

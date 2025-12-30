@@ -14,6 +14,29 @@ export function useLikes(videoId: string | null) {
     loadLikes();
   }, [videoId]);
 
+  // Escutar mudanças de autenticação e resetar estado quando fizer logout
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Se não houver sessão (logout), resetar o estado de liked
+      if (!session?.user) {
+        setLiked(false);
+      } else {
+        // Se houver sessão, recarregar likes para verificar se o usuário curtiu
+        if (videoId) {
+          // Usar setTimeout para evitar chamar loadLikes durante a renderização
+          setTimeout(() => {
+            loadLikes();
+          }, 0);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, videoId]);
+
   const loadLikes = useCallback(async () => {
     if (!videoId) return;
 
@@ -44,8 +67,8 @@ export function useLikes(videoId: string | null) {
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
-      alert('Você precisa estar logado para curtir vídeos');
-      return;
+      // Lançar erro para que o componente pai possa tratar (mostrar modal)
+      throw new Error('Usuário não autenticado');
     }
 
     setLoading(true);

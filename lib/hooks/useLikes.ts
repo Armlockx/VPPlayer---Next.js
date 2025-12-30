@@ -56,6 +56,9 @@ export function useLikes(videoId: string | null) {
       if (session?.user) {
         const userLike = likes?.find((like) => like.user_id === session.user.id);
         setLiked(!!userLike);
+      } else {
+        // Se não houver sessão, garantir que liked está false
+        setLiked(false);
       }
     } catch (error) {
       console.error('Erro ao carregar likes:', error);

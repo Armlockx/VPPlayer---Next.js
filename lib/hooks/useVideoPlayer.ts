@@ -17,6 +17,12 @@ export function useVideoPlayer() {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Rastreamento de estatísticas
+  const viewTrackedRef = useRef<Set<string>>(new Set());
+  const watchTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastWatchTimeUpdateRef = useRef<number>(Date.now());
+  const currentTrackingVideoIdRef = useRef<string | null>(null);
 
   const supabase = createClient();
 
@@ -115,6 +121,7 @@ export function useVideoPlayer() {
 
   const nextVideo = useCallback(() => {
     if (currentVideoIndex < videos.length - 1) {
+      stopWatchTimeTracking();
       const nextIndex = currentVideoIndex + 1;
       setCurrentVideoIndex(nextIndex);
       if (videoRef.current) {
@@ -122,10 +129,11 @@ export function useVideoPlayer() {
         videoRef.current.play();
       }
     }
-  }, [currentVideoIndex, videos]);
+  }, [currentVideoIndex, videos, stopWatchTimeTracking]);
 
   const previousVideo = useCallback(() => {
     if (currentVideoIndex > 0) {
+      stopWatchTimeTracking();
       const prevIndex = currentVideoIndex - 1;
       setCurrentVideoIndex(prevIndex);
       if (videoRef.current) {
@@ -133,10 +141,11 @@ export function useVideoPlayer() {
         videoRef.current.play();
       }
     }
-  }, [currentVideoIndex, videos]);
+  }, [currentVideoIndex, videos, stopWatchTimeTracking]);
 
   const playVideo = useCallback((index: number) => {
     if (index >= 0 && index < videos.length) {
+      stopWatchTimeTracking();
       setCurrentVideoIndex(index);
       if (videoRef.current) {
         videoRef.current.src = videos[index].url;
@@ -144,7 +153,121 @@ export function useVideoPlayer() {
         setIsPlaying(true);
       }
     }
-  }, [videos]);
+  }, [videos, stopWatchTimeTracking]);
+
+  // Função para incrementar views
+  const incrementViews = useCallback(async (videoId: string) => {
+    if (!videoId || viewTrackedRef.current.has(videoId)) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('increment_video_views', {
+        video_id: videoId,
+      });
+
+      if (error) {
+        console.error('Erro ao incrementar views:', error);
+        return;
+      }
+
+      viewTrackedRef.current.add(videoId);
+      console.log('Views incrementadas para vídeo:', videoId, 'Total:', data);
+
+      // Atualizar lista de vídeos localmente
+      setVideos((prev) =>
+        prev.map((video) =>
+          video.id === videoId
+            ? { ...video, views: typeof data === 'number' ? data : (video.views || 0) + 1 }
+            : video
+        )
+      );
+    } catch (error) {
+      console.error('Erro ao incrementar views:', error);
+    }
+  }, [supabase]);
+
+  // Função para incrementar watch_time
+  const incrementWatchTime = useCallback(async (videoId: string, seconds: number) => {
+    if (!videoId || seconds <= 0) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('increment_video_watch_time', {
+        video_id: videoId,
+        seconds: seconds,
+      });
+
+      if (error) {
+        console.error('Erro ao incrementar watch_time:', error);
+        return;
+      }
+
+      console.log(`Watch_time incrementado para vídeo ${videoId}: +${seconds}s, Total:`, data);
+
+      // Atualizar lista de vídeos localmente
+      setVideos((prev) =>
+        prev.map((video) =>
+          video.id === videoId
+            ? { ...video, watch_time: typeof data === 'number' ? data : (video.watch_time || 0) + seconds }
+            : video
+        )
+      );
+
+      lastWatchTimeUpdateRef.current = Date.now();
+    } catch (error) {
+      console.error('Erro ao incrementar watch_time:', error);
+    }
+  }, [supabase]);
+
+  // Iniciar rastreamento de watch_time
+  const startWatchTimeTracking = useCallback((videoId: string) => {
+    // Parar rastreamento anterior se houver
+    if (watchTimeIntervalRef.current) {
+      clearInterval(watchTimeIntervalRef.current);
+      watchTimeIntervalRef.current = null;
+    }
+
+    if (!videoId) return;
+
+    currentTrackingVideoIdRef.current = videoId;
+    lastWatchTimeUpdateRef.current = Date.now();
+
+    // Atualizar watch_time a cada 10 segundos
+    watchTimeIntervalRef.current = setInterval(() => {
+      const video = videoRef.current;
+      if (video && !video.paused && currentTrackingVideoIdRef.current === videoId) {
+        const now = Date.now();
+        const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+
+        if (elapsedSeconds >= 10) {
+          incrementWatchTime(videoId, elapsedSeconds);
+          lastWatchTimeUpdateRef.current = now;
+        }
+      }
+    }, 10000); // Verificar a cada 10 segundos
+  }, [incrementWatchTime]);
+
+  // Parar rastreamento de watch_time
+  const stopWatchTimeTracking = useCallback(() => {
+    if (watchTimeIntervalRef.current) {
+      clearInterval(watchTimeIntervalRef.current);
+      watchTimeIntervalRef.current = null;
+    }
+
+    // Salvar tempo restante antes de parar
+    const video = videoRef.current;
+    if (video && !video.paused && currentTrackingVideoIdRef.current) {
+      const now = Date.now();
+      const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+      if (elapsedSeconds > 0) {
+        incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds);
+      }
+    }
+
+    currentTrackingVideoIdRef.current = null;
+  }, [incrementWatchTime]);
 
   // Event handlers do vídeo
   useEffect(() => {
@@ -153,8 +276,27 @@ export function useVideoPlayer() {
 
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
     const handleDurationChange = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      
+      // Usar o índice atual para obter o vídeo correto
+      const currentIdx = currentVideoIndex;
+      const currentVideo = videos[currentIdx];
+      
+      if (currentVideo) {
+        // Incrementar views quando o vídeo começa a tocar pela primeira vez
+        if (!viewTrackedRef.current.has(currentVideo.id)) {
+          incrementViews(currentVideo.id);
+        }
+
+        // Iniciar rastreamento de watch_time
+        startWatchTimeTracking(currentVideo.id);
+      }
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      stopWatchTimeTracking();
+    };
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
     const handleProgress = () => {
@@ -186,6 +328,23 @@ export function useVideoPlayer() {
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('progress', handleProgress);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      stopWatchTimeTracking();
+    };
+  }, [videos, currentVideoIndex, incrementViews, startWatchTimeTracking, stopWatchTimeTracking]);
+
+  // Parar rastreamento quando o vídeo muda
+  useEffect(() => {
+    return () => {
+      stopWatchTimeTracking();
+    };
+  }, [currentVideoIndex, stopWatchTimeTracking]);
+
+  // Limpar intervalo quando componente desmontar
+  useEffect(() => {
+    return () => {
+      if (watchTimeIntervalRef.current) {
+        clearInterval(watchTimeIntervalRef.current);
+      }
     };
   }, []);
 

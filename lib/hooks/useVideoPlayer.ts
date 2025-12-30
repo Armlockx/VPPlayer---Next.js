@@ -119,42 +119,6 @@ export function useVideoPlayer() {
     }
   }, []);
 
-  const nextVideo = useCallback(() => {
-    if (currentVideoIndex < videos.length - 1) {
-      stopWatchTimeTracking();
-      const nextIndex = currentVideoIndex + 1;
-      setCurrentVideoIndex(nextIndex);
-      if (videoRef.current) {
-        videoRef.current.src = videos[nextIndex].url;
-        videoRef.current.play();
-      }
-    }
-  }, [currentVideoIndex, videos, stopWatchTimeTracking]);
-
-  const previousVideo = useCallback(() => {
-    if (currentVideoIndex > 0) {
-      stopWatchTimeTracking();
-      const prevIndex = currentVideoIndex - 1;
-      setCurrentVideoIndex(prevIndex);
-      if (videoRef.current) {
-        videoRef.current.src = videos[prevIndex].url;
-        videoRef.current.play();
-      }
-    }
-  }, [currentVideoIndex, videos, stopWatchTimeTracking]);
-
-  const playVideo = useCallback((index: number) => {
-    if (index >= 0 && index < videos.length) {
-      stopWatchTimeTracking();
-      setCurrentVideoIndex(index);
-      if (videoRef.current) {
-        videoRef.current.src = videos[index].url;
-        videoRef.current.play();
-        setIsPlaying(true);
-      }
-    }
-  }, [videos, stopWatchTimeTracking]);
-
   // Função para incrementar views
   const incrementViews = useCallback(async (videoId: string) => {
     if (!videoId || viewTrackedRef.current.has(videoId)) {
@@ -268,6 +232,42 @@ export function useVideoPlayer() {
 
     currentTrackingVideoIdRef.current = null;
   }, [incrementWatchTime]);
+
+  const nextVideo = useCallback(() => {
+    if (currentVideoIndex < videos.length - 1) {
+      stopWatchTimeTracking();
+      const nextIndex = currentVideoIndex + 1;
+      setCurrentVideoIndex(nextIndex);
+      if (videoRef.current) {
+        videoRef.current.src = videos[nextIndex].url;
+        videoRef.current.play();
+      }
+    }
+  }, [currentVideoIndex, videos, stopWatchTimeTracking]);
+
+  const previousVideo = useCallback(() => {
+    if (currentVideoIndex > 0) {
+      stopWatchTimeTracking();
+      const prevIndex = currentVideoIndex - 1;
+      setCurrentVideoIndex(prevIndex);
+      if (videoRef.current) {
+        videoRef.current.src = videos[prevIndex].url;
+        videoRef.current.play();
+      }
+    }
+  }, [currentVideoIndex, videos, stopWatchTimeTracking]);
+
+  const playVideo = useCallback((index: number) => {
+    if (index >= 0 && index < videos.length) {
+      stopWatchTimeTracking();
+      setCurrentVideoIndex(index);
+      if (videoRef.current) {
+        videoRef.current.src = videos[index].url;
+        videoRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  }, [videos, stopWatchTimeTracking]);
 
   // Event handlers do vídeo
   useEffect(() => {

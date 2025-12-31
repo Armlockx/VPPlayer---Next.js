@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Video } from '@/types/video';
+import { FiX, FiSave, FiFilm, FiLink, FiImage, FiClock, FiHash, FiUser } from 'react-icons/fi';
 
 interface VideoEditModalProps {
   isOpen: boolean;
@@ -60,7 +61,7 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
       onClose();
     } catch (error) {
       console.error('Erro ao salvar vídeo:', error);
-      alert('Erro ao salvar vídeo');
+      // Error is already shown via toast in parent component
     } finally {
       setSaving(false);
     }
@@ -80,6 +81,8 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
         alignItems: 'center',
         justifyContent: 'center',
         padding: '20px',
+        backdropFilter: 'blur(10px)',
+        animation: 'fadeIn 0.2s ease',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -88,12 +91,14 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
       <div
         style={{
           background: '#1a1a1a',
-          borderRadius: '12px',
+          borderRadius: '16px',
           width: '100%',
           maxWidth: '600px',
           maxHeight: '90vh',
           overflowY: 'auto',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+          animation: 'scaleIn 0.3s ease',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -104,9 +109,21 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
             alignItems: 'center',
             padding: '24px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'rgba(255, 255, 255, 0.03)',
           }}
         >
-          <h2 style={{ margin: 0, color: 'white', fontSize: '24px', fontWeight: 600 }}>
+          <h2
+            style={{
+              margin: 0,
+              color: 'white',
+              fontSize: '24px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <FiFilm size={24} />
             {video ? 'Editar Vídeo' : 'Adicionar Novo Vídeo'}
           </h2>
           <button
@@ -123,9 +140,18 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '50%',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.color = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
             }}
           >
-            ×
+            <FiX size={24} />
           </button>
         </div>
 
@@ -133,13 +159,16 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
           <div style={{ marginBottom: '20px' }}>
             <label
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '14px',
                 fontWeight: 600,
               }}
             >
+              <FiFilm size={16} />
               Título do Vídeo *
             </label>
             <input
@@ -158,6 +187,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 color: 'white',
                 fontSize: '14px',
                 boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             />
           </div>
@@ -165,13 +203,16 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
           <div style={{ marginBottom: '20px' }}>
             <label
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '14px',
                 fontWeight: 600,
               }}
             >
+              <FiLink size={16} />
               URL do Vídeo *
             </label>
             <input
@@ -189,6 +230,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 color: 'white',
                 fontSize: '14px',
                 boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             />
             <small style={{ display: 'block', marginTop: '6px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>
@@ -199,13 +249,16 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
           <div style={{ marginBottom: '20px' }}>
             <label
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '14px',
                 fontWeight: 600,
               }}
             >
+              <FiImage size={16} />
               URL da Thumbnail *
             </label>
             <input
@@ -223,6 +276,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 color: 'white',
                 fontSize: '14px',
                 boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             />
             <small style={{ display: 'block', marginTop: '6px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>
@@ -233,13 +295,16 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
           <div style={{ marginBottom: '20px' }}>
             <label
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '14px',
                 fontWeight: 600,
               }}
             >
+              <FiClock size={16} />
               Duração (formato: MM:SS)
             </label>
             <input
@@ -257,6 +322,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 color: 'white',
                 fontSize: '14px',
                 boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             />
             <small style={{ display: 'block', marginTop: '6px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>
@@ -267,13 +341,16 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
           <div style={{ marginBottom: '20px' }}>
             <label
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '14px',
                 fontWeight: 600,
               }}
             >
+              <FiHash size={16} />
               Ordem de Exibição
             </label>
             <input
@@ -290,6 +367,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 color: 'white',
                 fontSize: '14px',
                 boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             />
             <small style={{ display: 'block', marginTop: '6px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>
@@ -300,13 +386,16 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
           <div style={{ marginBottom: '24px' }}>
             <label
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 marginBottom: '8px',
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '14px',
                 fontWeight: 600,
               }}
             >
+              <FiUser size={16} />
               ID do Usuário (Uploader)
             </label>
             <input
@@ -323,6 +412,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 color: 'white',
                 fontSize: '14px',
                 boxSizing: 'border-box',
+                transition: 'all 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             />
             <small style={{ display: 'block', marginTop: '6px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>
@@ -330,12 +428,15 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
             </small>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 padding: '12px 24px',
                 background: 'rgba(255, 255, 255, 0.1)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -345,6 +446,19 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
                 fontWeight: 500,
                 cursor: saving ? 'not-allowed' : 'pointer',
                 opacity: saving ? 0.5 : 1,
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!saving) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!saving) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
               }}
             >
               Cancelar
@@ -353,17 +467,37 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
               type="submit"
               disabled={saving}
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
                 padding: '12px 24px',
-                background: saving ? 'rgba(255, 255, 255, 0.2)' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                background: saving
+                  ? 'rgba(255, 255, 255, 0.2)'
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 border: 'none',
                 borderRadius: '8px',
                 color: 'white',
                 fontSize: '14px',
                 fontWeight: 600,
                 cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.5 : 1,
+                opacity: saving ? 0.7 : 1,
+                transition: 'all 0.2s ease',
+                boxShadow: saving ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+              }}
+              onMouseEnter={(e) => {
+                if (!saving) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!saving) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                }
               }}
             >
+              <FiSave size={16} style={{ animation: saving ? 'spin 1s linear infinite' : 'none' }} />
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
@@ -372,4 +506,3 @@ export function VideoEditModal({ isOpen, onClose, onSave, video }: VideoEditModa
     </div>
   );
 }
-

@@ -5,6 +5,7 @@ import { useLikes } from '@/lib/hooks/useLikes';
 import { useComments } from '@/lib/hooks/useComments';
 import { useState } from 'react';
 import { CommentsModal } from '../modals/CommentsModal';
+import { ElasticSlider } from '../ui/ElasticSlider';
 
 interface VideoControlsProps {
   player: ReturnType<typeof import('@/lib/hooks/useVideoPlayer').useVideoPlayer>;
@@ -40,15 +41,22 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
     }
   };
 
-  const progressPercent = player.duration > 0 
-    ? (player.currentTime / player.duration) * 100 
-    : 0;
+  const handleSliderChange = (value: number) => {
+    if (player.duration > 0) {
+      player.seek(value);
+    }
+  };
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    const newTime = percent * player.duration;
-    player.seek(newTime);
+  const handleSliderDragStart = () => {
+    // Pausar vídeo durante o arraste para melhor UX
+    if (player.isPlaying) {
+      player.togglePlayPause();
+    }
+  };
+
+  const handleSliderDragEnd = () => {
+    // Opcional: retomar reprodução após soltar
+    // Você pode remover isso se preferir que o usuário clique em play manualmente
   };
 
   return (
@@ -67,25 +75,25 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
           pointerEvents: visible ? 'auto' : 'none',
         }}
       >
-        <div 
-          className="progress-container"
-          onClick={handleProgressClick}
+        <div
           style={{
             width: '100%',
-            height: '5px',
-            background: 'rgba(255,255,255,0.3)',
-            cursor: 'pointer',
-            transition: 'height 0.2s ease',
+            padding: '8px 0',
+            position: 'relative',
           }}
         >
-          <div
-            className="progress"
-            style={{
-              height: '100%',
-              width: `${progressPercent}%`,
-              background: 'red',
-              transition: 'width 0.1s ease',
-            }}
+          <ElasticSlider
+            min={0}
+            max={player.duration || 100}
+            value={player.currentTime}
+            onChange={handleSliderChange}
+            onDragStart={handleSliderDragStart}
+            onDragEnd={handleSliderDragEnd}
+            disabled={!player.duration || player.duration === 0}
+            showTooltip={true}
+            className="video-progress-slider"
+            trackClassName="video-progress-track"
+            thumbClassName="video-progress-thumb"
           />
         </div>
 

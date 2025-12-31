@@ -657,3 +657,134 @@ input[type="range"]:hover::-webkit-slider-thumb {
 .user-dropdown-menu {
   animation: fadeInDown 0.2s ease;
 }
+
+/* Admin Panel Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Admin Panel Responsive Styles */
+@media (max-width: 768px) {
+  body.admin-page {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  body.admin-page {
+    font-size: 13px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  body.admin-page {
+    font-size: 12px;
+  }
+}
+
+/* Admin Panel Utility Classes */
+.hide-on-mobile {
+  display: inline;
+}
+
+.hide-on-small {
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .hide-on-small {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .video-preview-sticky {
+    position: sticky !important;
+    top: 100px !important;
+    max-height: calc(100vh - 120px) !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .video-manager-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .video-manager-grid > div:last-child {
+    position: relative !important;
+    top: auto !important;
+    max-height: none !important;
+  }
+  
+  .video-preview-sticky {
+    position: relative !important;
+    top: auto !important;
+    max-height: none !important;
+  }
+  
+  .user-manager-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

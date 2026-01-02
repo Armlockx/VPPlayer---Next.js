@@ -202,7 +202,7 @@ export function UserManager() {
                 color: 'rgba(255, 255, 255, 0.6)',
               }}
             >
-              <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>👤</div>
+              <i className="bi bi-person" style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5, color: 'rgba(255, 255, 255, 0.5)' }}></i>
               <p style={{ margin: 0, fontSize: '16px', fontWeight: 500 }}>Nenhum usuário encontrado</p>
               <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)' }}>
                 {searchTerm ? 'Tente buscar com outros termos' : 'Ainda não há usuários cadastrados'}
@@ -351,7 +351,7 @@ export function UserManager() {
                 color: 'rgba(255, 255, 255, 0.6)',
               }}
             >
-              <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>👑</div>
+              <i className="bi bi-shield-fill" style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5, color: 'rgba(255, 255, 255, 0.5)' }}></i>
               <p style={{ margin: 0, fontSize: '16px', fontWeight: 500 }}>Nenhum administrador encontrado</p>
               <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)' }}>
                 Administradores aparecerão aqui

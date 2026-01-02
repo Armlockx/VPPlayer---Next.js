@@ -521,7 +521,11 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
               justifyContent: 'center',
             }}
           >
-            {player.isPlaying ? '⏸' : '▶'}
+            {player.isPlaying ? (
+              <i className="bi bi-pause-circle-fill" style={{ fontSize: '18px' }}></i>
+            ) : (
+              <i className="bi bi-play-circle-fill" style={{ fontSize: '18px' }}></i>
+            )}
           </button>
 
           <input
@@ -559,9 +563,10 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
               cursor: 'pointer',
             }}
           >
-            <span className="like-icon" style={{ fontSize: '18px' }}>
-              {likes.liked ? '❤️' : '♡'}
-            </span>
+            <i 
+              className={`bi ${likes.liked ? 'bi-heart-fill' : 'bi-heart'}`}
+              style={{ fontSize: '18px' }}
+            ></i>
             <span className="like-count" style={{ fontSize: '13px', fontWeight: 500 }}>
               {likes.likeCount}
             </span>
@@ -584,7 +589,7 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
               cursor: 'pointer',
             }}
           >
-            <span className="comments-icon" style={{ fontSize: '18px' }}>💬</span>
+            <i className="bi bi-chat-dots" style={{ fontSize: '18px' }}></i>
             <span className="comments-count" style={{ fontSize: '13px', fontWeight: 500 }}>
               {comments.length}
             </span>
@@ -611,7 +616,7 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
             }}
           >
             <span style={{ position: 'relative' }}>
-              ☰
+              <i className="bi bi-list" style={{ fontSize: '20px' }}></i>
               {player.videos.length > 0 && (
                 <span
                   style={{
@@ -652,7 +657,7 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
               zIndex: 11,
             }}
           >
-            ⛶
+            <i className="bi bi-arrows-fullscreen" style={{ fontSize: '18px' }}></i>
           </button>
         </div>
       </div>

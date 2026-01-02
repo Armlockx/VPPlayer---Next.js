@@ -38,9 +38,7 @@ export function useVideoPlayer() {
       if (error) throw error;
       if (data) {
         setVideos(data);
-        if (data.length > 0 && videoRef.current) {
-          videoRef.current.src = data[0].url;
-        }
+        // Não iniciar vídeo automaticamente - será controlado pelo componente
       }
     } catch (error) {
       console.error('Erro ao buscar vídeos:', error);

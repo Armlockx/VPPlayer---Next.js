@@ -13,7 +13,11 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function VideoPlayerPage() {
+interface VideoPlayerPageProps {
+  videoId?: string;
+}
+
+export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoPlayerPageProps) {
   const player = useVideoPlayer();
   const auth = useAuth();
   const router = useRouter();
@@ -25,12 +29,18 @@ export function VideoPlayerPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
 
-  // Mostrar modal de auth se não estiver autenticado
+  // Carregar vídeo específico se videoId for fornecido
   useEffect(() => {
-    if (!auth.loading && !auth.isAuthenticated) {
-      setAuthModalOpen(true);
+    if (videoId && player.videos.length > 0) {
+      const videoIndex = player.videos.findIndex(v => v.id === videoId);
+      if (videoIndex !== -1 && player.currentVideoIndex !== videoIndex) {
+        player.playVideo(videoIndex);
+      }
     }
-  }, [auth.loading, auth.isAuthenticated]);
+  }, [videoId, player.videos.length, player]);
+
+  // Não mostrar modal de auth automaticamente - login é opcional
+  // Removido o useEffect que forçava o modal
 
   // Mostrar banner de guest
   useEffect(() => {
@@ -219,7 +229,7 @@ export function VideoPlayerPage() {
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
           }}
         >
-          <span style={{ fontSize: '18px' }}>👤</span>
+          <i className="bi bi-person" style={{ fontSize: '18px' }}></i>
           <span style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '14px', fontWeight: 500 }}>
             Modo <strong style={{ color: 'rgba(255, 193, 7, 1)' }}>Convidado</strong>
           </span>

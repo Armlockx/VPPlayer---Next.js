@@ -1,9 +1,9 @@
-import { VideoPlayerPage } from '@/components/player/VideoPlayerPage';
+import { HomePage } from '@/components/home/HomePage';
 
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
-  return <VideoPlayerPage />;
+  return <HomePage />;
 }
 
 

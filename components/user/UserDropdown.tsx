@@ -92,7 +92,7 @@ export function UserDropdown({ isAdmin = false, controlsVisible = true }: UserDr
         onClick={() => setIsOpen(!isOpen)}
         style={{
           position: 'fixed',
-          top: '20px',
+          top: '5px',
           right: '20px',
           width: '45px',
           height: '45px',
@@ -222,7 +222,7 @@ export function UserDropdown({ isAdmin = false, controlsVisible = true }: UserDr
               e.currentTarget.style.background = 'transparent';
             }}
           >
-            <span style={{ fontSize: '18px' }}>{isAdmin ? '👑' : '👤'}</span>
+            <i className={`bi ${isAdmin ? 'bi-shield-fill' : 'bi-person'}`} style={{ fontSize: '18px' }}></i>
             <span>{isAdmin ? 'Painel Admin' : 'Meu Perfil'}</span>
           </button>
 
@@ -250,7 +250,7 @@ export function UserDropdown({ isAdmin = false, controlsVisible = true }: UserDr
               e.currentTarget.style.background = 'transparent';
             }}
           >
-            <span style={{ fontSize: '18px' }}>🚪</span>
+            <i className="bi bi-box-arrow-right" style={{ fontSize: '18px' }}></i>
             <span>Sair</span>
           </button>
         </div>

@@ -430,7 +430,7 @@ export function VideoManager() {
                 color: 'rgba(255, 255, 255, 0.6)',
               }}
             >
-              <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>🎬</div>
+              <i className="bi bi-camera-reels" style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5, color: 'rgba(255, 255, 255, 0.5)' }}></i>
               <p style={{ margin: 0, fontSize: '16px', fontWeight: 500 }}>Nenhum vídeo encontrado</p>
               <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)' }}>
                 {searchTerm ? 'Tente buscar com outros termos' : 'Adicione seu primeiro vídeo clicando em "Adicionar"'}
@@ -498,16 +498,17 @@ export function VideoManager() {
                           target.style.display = 'none';
                           const parent = target.parentElement;
                           if (parent && !parent.querySelector('.fallback-icon')) {
-                            const icon = document.createElement('div');
-                            icon.className = 'fallback-icon';
-                            icon.style.cssText = 'font-size: 32px;';
-                            icon.textContent = '🎬';
+                            const icon = document.createElement('i');
+                            icon.className = 'fallback-icon bi bi-camera-reels';
+                            icon.style.cssText = 'font-size: 32px; color: rgba(255, 255, 255, 0.5);';
                             parent.appendChild(icon);
                           }
                         }}
                       />
                     ) : (
-                      <div>🎬</div>
+                      <div style={{ fontSize: '32px', color: 'rgba(255, 255, 255, 0.5)' }}>
+                        <i className="bi bi-camera-reels"></i>
+                      </div>
                     )}
                     {video.duration && (
                       <div
@@ -755,7 +756,7 @@ export function VideoManager() {
                 color: 'rgba(255, 255, 255, 0.5)',
               }}
             >
-              <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>🎬</div>
+              <i className="bi bi-camera-reels" style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5, color: 'rgba(255, 255, 255, 0.5)' }}></i>
               <p style={{ margin: 0, fontSize: '14px', fontWeight: 500 }}>Selecione um vídeo para visualizar o preview</p>
             </div>
           )}

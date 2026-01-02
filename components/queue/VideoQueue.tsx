@@ -176,7 +176,7 @@ export function VideoQueue({
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
             }}
           >
-            📊
+            <i className="bi bi-bar-chart" style={{ fontSize: '18px' }}></i>
           </button>
         )}
       </div>
@@ -226,8 +226,8 @@ export function VideoQueue({
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               ) : (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
-                  🎬
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: 'rgba(255, 255, 255, 0.5)' }}>
+                  <i className="bi bi-camera-reels"></i>
                 </div>
               )}
             </div>

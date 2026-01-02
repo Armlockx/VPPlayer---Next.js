@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export interface Comment {
@@ -18,16 +18,80 @@ export interface Comment {
 export function useComments(videoId: string | null) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    if (!videoId) return;
+    // Limpar comentários imediatamente quando videoId muda ou é null
+    setComments([]);
+    
+    if (!videoId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadComments = async () => {
+      setLoading(true);
+      try {
+        // Primeiro buscar comentários
+        const { data: commentsData, error: commentsError } = await supabase
+          .from('video_comments')
+          .select('*')
+          .eq('video_id', videoId)
+          .order('created_at', { ascending: false });
+
+        if (commentsError) throw commentsError;
+
+        // Verificar se a requisição foi cancelada
+        if (cancelled) return;
+
+        if (commentsData && commentsData.length > 0) {
+          // Buscar perfis dos usuários
+          const userIds = [...new Set(commentsData.map(c => c.user_id))];
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', userIds);
+
+          // Verificar novamente se foi cancelada
+          if (cancelled) return;
+
+          // Combinar comentários com perfis
+          const commentsWithProfiles = commentsData.map(comment => ({
+            ...comment,
+            profiles: profilesData?.find(p => p.id === comment.user_id) || null,
+          }));
+
+          setComments(commentsWithProfiles as Comment[]);
+        } else {
+          setComments([]);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Erro ao carregar comentários:', error);
+          setComments([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadComments();
-  }, [videoId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId, supabase]);
 
   const loadComments = useCallback(async () => {
-    if (!videoId) return;
+    if (!videoId) {
+      setComments([]);
+      return;
+    }
 
+    setLoading(true);
     try {
       // Primeiro buscar comentários
       const { data: commentsData, error: commentsError } = await supabase
@@ -59,6 +123,8 @@ export function useComments(videoId: string | null) {
     } catch (error) {
       console.error('Erro ao carregar comentários:', error);
       setComments([]);
+    } finally {
+      setLoading(false);
     }
   }, [videoId, supabase]);
 

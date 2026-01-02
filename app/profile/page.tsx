@@ -426,7 +426,7 @@ export default function ProfilePage() {
                   gap: '8px',
                 }}
               >
-                <span>👑</span>
+                <i className="bi bi-shield-fill"></i>
                 <span>Administrador</span>
               </div>
             )}

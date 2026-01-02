@@ -73,7 +73,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 8px 0' }}>
-            V.P. Player
+            👌vPlay
           </h2>
           <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', margin: 0 }}>
             Entre para acessar seus vídeos

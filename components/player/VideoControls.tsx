@@ -5,6 +5,8 @@ import { useLikes } from '@/lib/hooks/useLikes';
 import { useComments } from '@/lib/hooks/useComments';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { CommentsModal } from '../modals/CommentsModal';
+import { HelpModal } from '../modals/HelpModal';
+import { PlaybackControls } from './PlaybackControls';
 
 interface VideoControlsProps {
   player: ReturnType<typeof import('@/lib/hooks/useVideoPlayer').useVideoPlayer>;
@@ -18,6 +20,7 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
   const likes = useLikes(player.currentVideo?.id || null);
   const { comments } = useComments(player.currentVideo?.id || null);
   const [commentsModalOpen, setCommentsModalOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState<number>(0);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -238,13 +241,14 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
       clearTimeout(captureTimeoutRef.current);
     }
 
+    // Debounce mais agressivo para melhorar performance
     captureTimeoutRef.current = setTimeout(() => {
       captureFrame(result.time).then((imageData) => {
         if (imageData) {
           setPreviewImage(imageData);
         }
       });
-    }, 150);
+    }, 300); // Aumentado de 150ms para 300ms
   }, [player.duration, captureFrame, isDragging, updateProgressFromMouse]);
 
   const handleProgressMouseLeave = useCallback(() => {
@@ -451,6 +455,27 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
                 borderRadius: '2px',
               }}
             >
+              {/* Indicador de buffer (cinza claro) */}
+              {player.bufferedRanges.length > 0 && player.duration > 0 && (
+                <>
+                  {player.bufferedRanges.map((range, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        position: 'absolute',
+                        left: `${(range.start / player.duration) * 100}%`,
+                        top: 0,
+                        height: '100%',
+                        width: `${((range.end - range.start) / player.duration) * 100}%`,
+                        background: 'rgba(255, 255, 255, 0.5)',
+                        borderRadius: '2px',
+                        zIndex: 1,
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+              
               {/* Progresso assistido (vermelho) - mostrar posição atual ou de arraste */}
               <div
                 style={{
@@ -466,6 +491,7 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
                   background: 'red',
                   borderRadius: '2px',
                   transition: isDragging ? 'none' : 'width 0.1s ease',
+                  zIndex: 2,
                 }}
               />
               
@@ -545,6 +571,37 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
           <div className="time" style={{ color: 'white', fontSize: '14px' }}>
             {formatTime(player.currentTime)} / {formatTime(player.duration)}
           </div>
+
+          {/* Playback Controls (Speed & Quality) */}
+          <PlaybackControls
+            playbackRate={player.playbackRate}
+            onPlaybackRateChange={player.changePlaybackRate}
+            quality={player.quality}
+            onQualityChange={player.changeQuality}
+            connectionQuality={player.connectionQuality}
+            visible={visible}
+          />
+
+          {/* Help Button */}
+          <button
+            onClick={() => setHelpModalOpen(true)}
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              borderRadius: '50%',
+              color: 'white',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Ajuda e Atalhos"
+          >
+            <i className="bi bi-question-circle" style={{ fontSize: '18px' }}></i>
+          </button>
 
           {/* Like Button */}
           <button
@@ -666,6 +723,12 @@ export function VideoControls({ player, visible, onQueueToggle, onAuthRequired, 
         isOpen={commentsModalOpen}
         onClose={() => setCommentsModalOpen(false)}
         videoId={player.currentVideo?.id || null}
+        onSeek={(time) => player.seek(time)}
+      />
+
+      <HelpModal
+        isOpen={helpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
       />
     </>
   );

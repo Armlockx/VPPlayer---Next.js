@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Header } from '../layout/Header';
 import { Sidebar } from '../layout/Sidebar';
 import { VideoGrid } from './VideoGrid';
+import { ContinueWatching } from './ContinueWatching';
 import type { Video } from '@/types/video';
 
 export function HomePage() {
@@ -59,6 +60,7 @@ export function HomePage() {
           transition: 'margin-left 0.3s ease',
           background: '#0f0f0f'
         }}>
+          <ContinueWatching />
           <VideoGrid videos={filteredVideos} loading={loading} />
         </main>
       </div>

@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Profile } from '@/types/user';
+import { HistoryManager } from './HistoryManager';
 
 interface UserDropdownProps {
   isAdmin?: boolean;
@@ -15,6 +16,7 @@ export function UserDropdown({ isAdmin = false, controlsVisible = true }: UserDr
   const auth = useAuth();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -227,6 +229,37 @@ export function UserDropdown({ isAdmin = false, controlsVisible = true }: UserDr
           </button>
 
           <button
+            onClick={() => {
+              setIsOpen(false);
+              setShowHistory(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              gap: '12px',
+              transition: 'background 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <i className="bi bi-clock-history" style={{ fontSize: '18px' }}></i>
+            <span>Histórico</span>
+          </button>
+
+          <button
             onClick={handleLogout}
             style={{
               width: '100%',
@@ -253,6 +286,73 @@ export function UserDropdown({ isAdmin = false, controlsVisible = true }: UserDr
             <i className="bi bi-box-arrow-right" style={{ fontSize: '18px' }}></i>
             <span>Sair</span>
           </button>
+        </div>
+      )}
+
+      {showHistory && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0, 0, 0, 0.85)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowHistory(false);
+          }}
+        >
+          <div
+            style={{
+              background: '#141414',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '800px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <h2 style={{ margin: 0, color: 'white', fontSize: '24px', fontWeight: 600 }}>
+                Histórico de Visualização
+              </h2>
+              <button
+                onClick={() => setShowHistory(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '32px',
+                  cursor: 'pointer',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <HistoryManager onClose={() => setShowHistory(false)} />
+          </div>
         </div>
       )}
 

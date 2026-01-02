@@ -10,7 +10,8 @@ import { UploadModal } from '../modals/UploadModal';
 import { UserDropdown } from '../user/UserDropdown';
 import { useVideoPlayer } from '@/lib/hooks/useVideoPlayer';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useState, useEffect } from 'react';
+import { useVideoHistory } from '@/lib/hooks/useVideoHistory';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface VideoPlayerPageProps {
@@ -20,6 +21,7 @@ interface VideoPlayerPageProps {
 export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoPlayerPageProps) {
   const player = useVideoPlayer();
   const auth = useAuth();
+  const history = useVideoHistory();
   const router = useRouter();
   const [queueOpen, setQueueOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -28,6 +30,8 @@ export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoP
   const [statsModalOpen, setStatsModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
+  const progressSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedTimeRef = useRef<number>(0);
 
   // Carregar vídeo específico se videoId for fornecido
   useEffect(() => {
@@ -64,6 +68,90 @@ export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoP
     checkAdmin();
   }, [auth.user, auth.isGuest, auth]);
 
+  // Carregar progresso salvo quando vídeo muda
+  useEffect(() => {
+    let mounted = true;
+    
+    const loadSavedProgress = async () => {
+      if (!player.currentVideo || !auth.isAuthenticated || auth.isGuest) return;
+      
+      try {
+        const savedTime = await history.getVideoProgress(player.currentVideo.id);
+        if (mounted && savedTime !== null && savedTime > 5) {
+          // Só restaurar se tiver mais de 5 segundos salvos
+          player.seek(savedTime);
+        }
+      } catch (error) {
+        // Ignorar erros silenciosamente (tabela pode não existir ainda)
+      }
+    };
+
+    if (player.currentVideo) {
+      // Debounce para evitar múltiplas chamadas
+      const timeoutId = setTimeout(loadSavedProgress, 500);
+      return () => {
+        mounted = false;
+        clearTimeout(timeoutId);
+      };
+    }
+    
+    return () => {
+      mounted = false;
+    };
+  }, [player.currentVideo?.id, auth.isAuthenticated, auth.isGuest, history, player]);
+
+  // Salvar progresso periodicamente
+  useEffect(() => {
+    if (!player.currentVideo || !auth.isAuthenticated || auth.isGuest) {
+      if (progressSaveIntervalRef.current) {
+        clearInterval(progressSaveIntervalRef.current);
+        progressSaveIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Salvar progresso a cada 10 segundos
+    progressSaveIntervalRef.current = setInterval(() => {
+      if (player.currentVideo && player.duration > 0) {
+        const currentTime = player.currentTime;
+        // Só salvar se mudou significativamente (mais de 2 segundos)
+        if (Math.abs(currentTime - lastSavedTimeRef.current) > 2) {
+          history.saveProgress(
+            player.currentVideo.id,
+            currentTime,
+            player.duration,
+            false
+          );
+          lastSavedTimeRef.current = currentTime;
+        }
+      }
+    }, 10000);
+
+    return () => {
+      if (progressSaveIntervalRef.current) {
+        clearInterval(progressSaveIntervalRef.current);
+      }
+    };
+  }, [player.currentVideo?.id, player.currentTime, player.duration, auth.isAuthenticated, auth.isGuest, history]);
+
+  // Salvar progresso quando vídeo termina
+  useEffect(() => {
+    const video = player.videoRef.current;
+    if (!video || !player.currentVideo || !auth.isAuthenticated || auth.isGuest) return;
+
+    const handleEnded = () => {
+      history.saveProgress(
+        player.currentVideo!.id,
+        player.duration,
+        player.duration,
+        true // Completado
+      );
+    };
+
+    video.addEventListener('ended', handleEnded);
+    return () => video.removeEventListener('ended', handleEnded);
+  }, [player.currentVideo?.id, player.duration, auth.isAuthenticated, auth.isGuest, history, player]);
+
   // Comandos de teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -94,6 +182,24 @@ export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoP
           e.preventDefault();
           player.decreaseVolume(0.1);
           break;
+        case 'KeyF':
+          e.preventDefault();
+          player.toggleFullscreen();
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          player.changeVolume(player.volume > 0 ? 0 : 1);
+          break;
+        default:
+          // Atalhos numéricos (0-9) para ir para 0-90% do vídeo
+          if (e.code.startsWith('Digit') && player.duration > 0) {
+            const digit = parseInt(e.code.replace('Digit', ''));
+            if (digit >= 0 && digit <= 9) {
+              e.preventDefault();
+              const targetTime = (digit / 10) * player.duration;
+              player.seek(targetTime);
+            }
+          }
       }
     };
 
@@ -105,6 +211,7 @@ export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoP
 
   return (
     <div 
+      ref={player.playerContainerRef}
       className="player" 
       onMouseMove={player.resetControlsTimeout}
       style={{
@@ -121,6 +228,7 @@ export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoP
         ref={player.videoRef}
         className="w-full h-full object-contain"
         onClick={player.togglePlayPause}
+        controls={false}
         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
       />
       

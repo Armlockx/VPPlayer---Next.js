@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useVideoHistory } from '@/lib/hooks/useVideoHistory';
+import { useAuth } from '@/lib/hooks/useAuth';
 import type { Video } from '@/types/video';
 
 interface VideoCardProps {
@@ -9,6 +11,12 @@ interface VideoCardProps {
 
 export function VideoCard({ video }: VideoCardProps) {
   const router = useRouter();
+  const history = useVideoHistory();
+  const auth = useAuth();
+  
+  const isCompleted = auth.isAuthenticated && !auth.isGuest 
+    ? history.isVideoCompleted(video.id)
+    : false;
 
   const handleClick = () => {
     router.push(`/watch/${video.id}`);
@@ -88,6 +96,27 @@ export function VideoCard({ video }: VideoCardProps) {
             fontWeight: 'bold'
           }}>
             {video.duration}
+          </div>
+        )}
+
+        {/* Badge "Assistir de novo" */}
+        {isCompleted && (
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            left: '8px',
+            background: 'rgba(229, 9, 20, 0.9)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}>
+            <i className="bi bi-arrow-clockwise" style={{ fontSize: '10px' }}></i>
+            Assistir de novo
           </div>
         )}
       </div>

@@ -9,10 +9,16 @@ export interface Comment {
   user_id: string;
   comment_text: string;
   created_at: string;
+  updated_at?: string;
+  edited_at?: string | null;
+  timestamp_seconds?: number | null;
+  parent_comment_id?: string | null;
+  reply_count?: number;
   profiles?: {
     username: string;
     avatar_url: string | null;
   };
+  replies?: Comment[]; // Respostas (threads)
 }
 
 export function useComments(videoId: string | null) {
@@ -93,11 +99,12 @@ export function useComments(videoId: string | null) {
 
     setLoading(true);
     try {
-      // Primeiro buscar comentários
+      // Buscar comentários principais (sem parent_comment_id)
       const { data: commentsData, error: commentsError } = await supabase
         .from('video_comments')
         .select('*')
         .eq('video_id', videoId)
+        .is('parent_comment_id', null)
         .order('created_at', { ascending: false });
 
       if (commentsError) throw commentsError;
@@ -110,13 +117,41 @@ export function useComments(videoId: string | null) {
           .select('id, username, avatar_url')
           .in('id', userIds);
 
-        // Combinar comentários com perfis
-        const commentsWithProfiles = commentsData.map(comment => ({
-          ...comment,
-          profiles: profilesData?.find(p => p.id === comment.user_id) || null,
-        }));
+        // Para cada comentário principal, buscar suas respostas
+        const commentsWithReplies = await Promise.all(
+          commentsData.map(async (comment) => {
+            // Buscar respostas deste comentário
+            const { data: repliesData } = await supabase
+              .from('video_comments')
+              .select('*')
+              .eq('parent_comment_id', comment.id)
+              .order('created_at', { ascending: true });
 
-        setComments(commentsWithProfiles as Comment[]);
+            // Buscar perfis das respostas
+            let repliesWithProfiles: Comment[] = [];
+            if (repliesData && repliesData.length > 0) {
+              const replyUserIds = [...new Set(repliesData.map(r => r.user_id))];
+              const { data: replyProfiles } = await supabase
+                .from('profiles')
+                .select('id, username, avatar_url')
+                .in('id', replyUserIds);
+
+              repliesWithProfiles = repliesData.map(reply => ({
+                ...reply,
+                profiles: replyProfiles?.find(p => p.id === reply.user_id) || null,
+              })) as Comment[];
+            }
+
+            return {
+              ...comment,
+              profiles: profilesData?.find(p => p.id === comment.user_id) || null,
+              reply_count: repliesWithProfiles.length,
+              replies: repliesWithProfiles,
+            };
+          })
+        );
+
+        setComments(commentsWithReplies as Comment[]);
       } else {
         setComments([]);
       }
@@ -128,7 +163,11 @@ export function useComments(videoId: string | null) {
     }
   }, [videoId, supabase]);
 
-  const addComment = useCallback(async (content: string) => {
+  const addComment = useCallback(async (
+    content: string, 
+    parentCommentId?: string | null, 
+    timestampSeconds?: number | null
+  ) => {
     if (!videoId || !content.trim() || loading) return;
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -140,13 +179,23 @@ export function useComments(videoId: string | null) {
     setLoading(true);
 
     try {
+      const insertData: any = {
+        video_id: videoId,
+        user_id: session.user.id,
+        comment_text: content.trim(),
+      };
+
+      if (parentCommentId) {
+        insertData.parent_comment_id = parentCommentId;
+      }
+
+      if (timestampSeconds !== null && timestampSeconds !== undefined) {
+        insertData.timestamp_seconds = timestampSeconds;
+      }
+
       const { data, error } = await supabase
         .from('video_comments')
-        .insert({
-          video_id: videoId,
-          user_id: session.user.id,
-          comment_text: content.trim(),
-        })
+        .insert(insertData)
         .select('*')
         .single();
 
@@ -163,9 +212,28 @@ export function useComments(videoId: string | null) {
         const commentWithProfile = {
           ...data,
           profiles: profile || null,
+          replies: [],
+          reply_count: 0,
         };
 
-        setComments((prev) => [commentWithProfile as Comment, ...prev]);
+        if (parentCommentId) {
+          // Se é uma resposta, atualizar o comentário pai
+          setComments((prev) =>
+            prev.map((comment) => {
+              if (comment.id === parentCommentId) {
+                return {
+                  ...comment,
+                  reply_count: (comment.reply_count || 0) + 1,
+                  replies: [...(comment.replies || []), commentWithProfile as Comment],
+                };
+              }
+              return comment;
+            })
+          );
+        } else {
+          // Se é um comentário principal, adicionar no início
+          setComments((prev) => [commentWithProfile as Comment, ...prev]);
+        }
       }
     } catch (error) {
       console.error('Erro ao adicionar comentário:', error);
@@ -211,10 +279,67 @@ export function useComments(videoId: string | null) {
     }
   }, [loading, supabase]);
 
+  const editComment = useCallback(async (commentId: string, newText: string) => {
+    if (!commentId || !newText.trim() || loading) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    setLoading(true);
+
+    try {
+      // Verificar se o comentário pertence ao usuário
+      const { data: comment } = await supabase
+        .from('video_comments')
+        .select('user_id')
+        .eq('id', commentId)
+        .single();
+
+      if (comment?.user_id !== session.user.id) {
+        alert('Você não tem permissão para editar este comentário');
+        return;
+      }
+
+      const { data: updatedComment, error } = await supabase
+        .from('video_comments')
+        .update({ comment_text: newText.trim() })
+        .eq('id', commentId)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      // Atualizar comentário na lista
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c.id === commentId) {
+            return { ...c, ...updatedComment };
+          }
+          // Atualizar também nas respostas
+          if (c.replies) {
+            return {
+              ...c,
+              replies: c.replies.map((reply) =>
+                reply.id === commentId ? { ...reply, ...updatedComment } : reply
+              ),
+            };
+          }
+          return c;
+        })
+      );
+    } catch (error) {
+      console.error('Erro ao editar comentário:', error);
+      alert('Erro ao editar comentário');
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, supabase]);
+
   return {
     comments,
     loading,
     addComment,
+    editComment,
     deleteComment,
     refreshComments: loadComments,
   };

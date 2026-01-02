@@ -9,7 +9,7 @@ import { StatsPanel } from './StatsPanel';
 import { createClient } from '@/lib/supabase/client';
 import type { Profile } from '@/types/user';
 import { ToastContainer, useToast } from './Toast';
-import { FiLogOut, FiArrowLeft, FiShield, FiRefreshCw } from 'react-icons/fi';
+import { FiLogOut, FiArrowLeft, FiShield, FiRefreshCw, FiFileText } from 'react-icons/fi';
 import { SkeletonCard, SkeletonCircle, SkeletonText } from './SkeletonLoader';
 
 export function AdminDashboard() {
@@ -206,6 +206,36 @@ export function AdminDashboard() {
             </h1>
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => router.push('/admin/logs')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                background: 'rgba(229, 9, 20, 0.2)',
+                border: '1px solid rgba(229, 9, 20, 0.4)',
+                borderRadius: '8px',
+                color: '#e50914',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(229, 9, 20, 0.3)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(229, 9, 20, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(229, 9, 20, 0.2)';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <FiFileText size={16} />
+              <span className="hide-on-mobile">LOGS</span>
+            </button>
             <button
               onClick={handleRefresh}
               style={{

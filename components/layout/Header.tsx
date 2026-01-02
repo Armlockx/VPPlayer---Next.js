@@ -71,7 +71,7 @@ export function Header({ searchTerm, onSearchChange, onMenuClick }: HeaderProps)
           }}
         >
           <i className="bi bi-play-circle-fill" style={{ color: '#FF0000', fontSize: '24px', marginRight: '4px' }}></i>
-          <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>VP Player</span>
+          <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>👌vPlay</span>
         </div>
 
         {/* Search Bar */}

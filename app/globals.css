@@ -20,6 +20,67 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ============================================
+   SCROLLBAR CUSTOMIZADA - Estilo Moderno
+   ============================================ */
+
+/* Webkit (Chrome, Edge, Safari, Opera) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 15, 15, 0.8);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #E50914 0%, #B20710 100%);
+  border-radius: 10px;
+  border: 2px solid rgba(15, 15, 15, 0.8);
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #FF1A2A 0%, #E50914 100%);
+  box-shadow: 0 0 8px rgba(229, 9, 20, 0.5);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #B20710 0%, #8B0508 100%);
+}
+
+::-webkit-scrollbar-corner {
+  background: rgba(15, 15, 15, 0.8);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #E50914 rgba(15, 15, 15, 0.8);
+}
+
+/* Scrollbar para elementos específicos com fundo mais claro */
+.light-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.light-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(229, 9, 20, 0.8) 0%, rgba(178, 7, 16, 0.8) 100%);
+  border: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Scrollbar mais fina para áreas menores */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border: 1px solid rgba(15, 15, 15, 0.8);
+}
+
 /* Permitir scroll na página admin */
 body.admin-page {
   overflow-y: auto;
@@ -48,13 +109,35 @@ body.admin-page {
   background: #000;
 }
 
+/* Prefixos para compatibilidade com diferentes navegadores */
+.player:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.player:-moz-full-screen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.player:-ms-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
 video {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.player:fullscreen video {
+.player:fullscreen video,
+.player:-webkit-full-screen video,
+.player:-moz-full-screen video,
+.player:-ms-fullscreen video {
   width: 100%;
   height: 100%;
   object-fit: contain;

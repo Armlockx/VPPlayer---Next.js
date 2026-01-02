@@ -6,10 +6,15 @@ import type { Video } from '@/types/video';
 
 export function useVideoPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [quality, setQuality] = useState<'auto' | number>('auto');
+  const [bufferedRanges, setBufferedRanges] = useState<{ start: number; end: number }[]>([]);
+  const [connectionQuality, setConnectionQuality] = useState<'good' | 'medium' | 'poor'>('good');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -22,7 +27,10 @@ export function useVideoPlayer() {
   const viewTrackedRef = useRef<Set<string>>(new Set());
   const watchTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastWatchTimeUpdateRef = useRef<number>(Date.now());
+  const lastVideoTimeRef = useRef<number>(0); // Último currentTime do vídeo
   const currentTrackingVideoIdRef = useRef<string | null>(null);
+  const currentVideoUrlRef = useRef<string | null>(null); // Rastrear URL do vídeo atual
+  const wasPlayingWhenHiddenRef = useRef<boolean>(false); // Se estava tocando quando perdeu foco
 
   const supabase = createClient();
 
@@ -50,14 +58,21 @@ export function useVideoPlayer() {
   }, [fetchVideos]);
 
   // Controles de reprodução
-  const togglePlayPause = useCallback(() => {
+  const togglePlayPause = useCallback(async () => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
+        setIsPlaying(false);
       } else {
-        videoRef.current.play();
+        try {
+          await videoRef.current.play();
+          setIsPlaying(true);
+        } catch (error) {
+          // Autoplay bloqueado - usuário precisa interagir primeiro
+          console.log('Autoplay bloqueado, aguardando interação do usuário');
+          setIsPlaying(false);
+        }
       }
-      setIsPlaying(!isPlaying);
     }
   }, [isPlaying]);
 
@@ -107,13 +122,66 @@ export function useVideoPlayer() {
     }
   }, []);
 
+  // Controles de velocidade de reprodução
+  const changePlaybackRate = useCallback((rate: number) => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+      setPlaybackRate(rate);
+    }
+  }, []);
+
+  // Controles de qualidade visual (CSS scaling)
+  const changeQuality = useCallback((quality: 'auto' | number) => {
+    setQuality(quality);
+    if (videoRef.current) {
+      const video = videoRef.current;
+      if (quality === 'auto') {
+        video.style.transform = '';
+        video.style.transformOrigin = '';
+      } else {
+        video.style.transform = `scale(${quality})`;
+        video.style.transformOrigin = 'center center';
+      }
+    }
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement && videoRef.current) {
-      videoRef.current.requestFullscreen();
-      setIsFullscreen(true);
+    const container = playerContainerRef.current;
+    if (!container) return;
+
+    // Verificar se já está em fullscreen (com suporte a prefixos)
+    const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    );
+
+    if (!isCurrentlyFullscreen) {
+      // Entrar em fullscreen usando o container, não o video
+      if (container.requestFullscreen) {
+        container.requestFullscreen();
+      } else if ((container as any).webkitRequestFullscreen) {
+        // Safari
+        (container as any).webkitRequestFullscreen();
+      } else if ((container as any).mozRequestFullScreen) {
+        // Firefox
+        (container as any).mozRequestFullScreen();
+      } else if ((container as any).msRequestFullscreen) {
+        // IE/Edge
+        (container as any).msRequestFullscreen();
+      }
     } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
+      // Sair do fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
     }
   }, []);
 
@@ -193,25 +261,54 @@ export function useVideoPlayer() {
 
     if (!videoId) return;
 
+    const video = videoRef.current;
+    if (!video) return;
+
     currentTrackingVideoIdRef.current = videoId;
     lastWatchTimeUpdateRef.current = Date.now();
+    lastVideoTimeRef.current = video.currentTime || 0;
+    wasPlayingWhenHiddenRef.current = !video.paused;
 
     // Atualizar watch_time a cada 5 segundos
+    // IMPORTANTE: Continuar contando mesmo quando a aba não está focada
     watchTimeIntervalRef.current = setInterval(() => {
       const video = videoRef.current;
       if (!video) return;
 
-      // Verificar se ainda estamos rastreando o mesmo vídeo e se está tocando
-      if (currentTrackingVideoIdRef.current === videoId && !video.paused && !video.ended) {
-        const now = Date.now();
-        const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+      // Verificar se ainda estamos rastreando o mesmo vídeo
+      // Verificar pela URL também para garantir que é o vídeo correto
+      const currentUrl = video.src || video.currentSrc;
+      if (currentVideoUrlRef.current && currentUrl !== currentVideoUrlRef.current) {
+        // Vídeo mudou, parar rastreamento
+        return;
+      }
 
-        // Atualizar se passaram pelo menos 5 segundos
-        if (elapsedSeconds >= 5) {
-          incrementWatchTime(videoId, elapsedSeconds).catch((error) => {
-            console.error('Erro ao incrementar watch_time no intervalo:', error);
-          });
-          lastWatchTimeUpdateRef.current = now;
+      // Continuar contando mesmo se a aba não estiver focada
+      // Usar o currentTime do vídeo para calcular o tempo real assistido
+      if (currentTrackingVideoIdRef.current === videoId && !video.ended) {
+        const currentVideoTime = video.currentTime || 0;
+        const timeElapsed = currentVideoTime - lastVideoTimeRef.current;
+        
+        // Só contar se o tempo avançou (vídeo estava tocando)
+        // Se estava tocando quando perdeu foco, continuar contando
+        if (timeElapsed > 0 || wasPlayingWhenHiddenRef.current) {
+          const now = Date.now();
+          const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+
+          // Atualizar se passaram pelo menos 5 segundos
+          if (elapsedSeconds >= 5) {
+            // Usar o tempo real do vídeo (currentTime) como base
+            // Isso garante que contamos apenas o tempo que o vídeo realmente avançou
+            const timeToCount = timeElapsed > 0 ? timeElapsed : elapsedSeconds;
+            
+            if (timeToCount > 0) {
+              incrementWatchTime(videoId, timeToCount).catch((error) => {
+                console.error('Erro ao incrementar watch_time no intervalo:', error);
+              });
+              lastWatchTimeUpdateRef.current = now;
+              lastVideoTimeRef.current = currentVideoTime;
+            }
+          }
         }
       }
     }, 5000); // Verificar a cada 5 segundos
@@ -251,41 +348,78 @@ export function useVideoPlayer() {
     currentTrackingVideoIdRef.current = null;
   }, [saveWatchTime]);
 
-  const nextVideo = useCallback(() => {
+  const nextVideo = useCallback(async () => {
     if (currentVideoIndex < videos.length - 1) {
       stopWatchTimeTracking();
       const nextIndex = currentVideoIndex + 1;
       setCurrentVideoIndex(nextIndex);
       if (videoRef.current) {
         videoRef.current.src = videos[nextIndex].url;
-        videoRef.current.play();
+        currentVideoUrlRef.current = videos[nextIndex].url; // Atualizar URL atual
+        try {
+          await videoRef.current.play();
+          setIsPlaying(true);
+        } catch (error) {
+          // Autoplay bloqueado
+          setIsPlaying(false);
+        }
       }
     }
   }, [currentVideoIndex, videos, stopWatchTimeTracking]);
 
-  const previousVideo = useCallback(() => {
+  const previousVideo = useCallback(async () => {
     if (currentVideoIndex > 0) {
       stopWatchTimeTracking();
       const prevIndex = currentVideoIndex - 1;
       setCurrentVideoIndex(prevIndex);
       if (videoRef.current) {
         videoRef.current.src = videos[prevIndex].url;
-        videoRef.current.play();
+        currentVideoUrlRef.current = videos[prevIndex].url; // Atualizar URL atual
+        try {
+          await videoRef.current.play();
+          setIsPlaying(true);
+        } catch (error) {
+          // Autoplay bloqueado
+          setIsPlaying(false);
+        }
       }
     }
   }, [currentVideoIndex, videos, stopWatchTimeTracking]);
 
-  const playVideo = useCallback((index: number) => {
+  const playVideo = useCallback(async (index: number) => {
     if (index >= 0 && index < videos.length) {
       stopWatchTimeTracking();
       setCurrentVideoIndex(index);
       if (videoRef.current) {
         videoRef.current.src = videos[index].url;
-        videoRef.current.play();
-        setIsPlaying(true);
+        currentVideoUrlRef.current = videos[index].url; // Atualizar URL atual
+        try {
+          await videoRef.current.play();
+          setIsPlaying(true);
+        } catch (error) {
+          // Autoplay bloqueado - usuário precisa clicar para iniciar
+          setIsPlaying(false);
+        }
       }
     }
   }, [videos, stopWatchTimeTracking]);
+
+  // Monitorar qualidade de conexão
+  const updateConnectionQuality = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    // networkState: 0 = EMPTY, 1 = IDLE, 2 = LOADING, 3 = NO_SOURCE
+    // readyState: 0 = HAVE_NOTHING, 1 = HAVE_METADATA, 2 = HAVE_CURRENT_DATA, 3 = HAVE_FUTURE_DATA, 4 = HAVE_ENOUGH_DATA
+    
+    if (video.readyState >= 4) {
+      setConnectionQuality('good');
+    } else if (video.readyState >= 2) {
+      setConnectionQuality('medium');
+    } else {
+      setConnectionQuality('poor');
+    }
+  }, []);
 
   // Event handlers do vídeo
   useEffect(() => {
@@ -296,10 +430,15 @@ export function useVideoPlayer() {
     const handleDurationChange = () => setDuration(video.duration);
     const handlePlay = () => {
       setIsPlaying(true);
+      wasPlayingWhenHiddenRef.current = true;
       
-      // Usar o índice atual para obter o vídeo correto
-      const currentIdx = currentVideoIndex;
-      const currentVideo = videos[currentIdx];
+      // Identificar vídeo atual pela URL do elemento video, não pelo índice
+      // Isso garante que sempre pegamos o vídeo correto
+      const currentUrl = video.src || video.currentSrc;
+      currentVideoUrlRef.current = currentUrl;
+      
+      // Encontrar o vídeo na lista pela URL
+      const currentVideo = videos.find(v => v.url === currentUrl);
       
       if (currentVideo) {
         // Incrementar views quando o vídeo começa a tocar pela primeira vez
@@ -312,27 +451,52 @@ export function useVideoPlayer() {
         if (currentTrackingVideoIdRef.current !== currentVideo.id) {
           startWatchTimeTracking(currentVideo.id);
         } else {
-          // Continuar rastreamento, apenas atualizar timestamp
+          // Continuar rastreamento, apenas atualizar timestamp e currentTime
           lastWatchTimeUpdateRef.current = Date.now();
+          lastVideoTimeRef.current = video.currentTime || 0;
         }
       }
     };
     const handlePause = () => {
       setIsPlaying(false);
+      wasPlayingWhenHiddenRef.current = false;
+      
       // Salvar o tempo assistido quando pausa (mesmo que seja menos de 5 segundos)
-      saveWatchTime();
+      // Mas só salvar se foi pausado manualmente, não por perda de foco
+      // Verificar se a aba está visível
+      if (!document.hidden) {
+        saveWatchTime();
+      }
     };
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
+
     const handleProgress = () => {
       if (video.buffered.length > 0) {
         const buffered = video.buffered.end(video.buffered.length - 1);
         const progress = (buffered / video.duration) * 100;
         setLoadProgress(progress);
+        
+        // Atualizar ranges de buffer
+        const ranges: { start: number; end: number }[] = [];
+        for (let i = 0; i < video.buffered.length; i++) {
+          ranges.push({
+            start: video.buffered.start(i),
+            end: video.buffered.end(i)
+          });
+        }
+        setBufferedRanges(ranges);
       }
     };
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      // Verificar fullscreen com suporte a prefixos de diferentes navegadores
+      const isFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFullscreen);
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -342,7 +506,16 @@ export function useVideoPlayer() {
     video.addEventListener('loadstart', handleLoadStart);
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('progress', handleProgress);
+    video.addEventListener('loadeddata', updateConnectionQuality);
+    video.addEventListener('canplaythrough', updateConnectionQuality);
+    video.addEventListener('waiting', () => setConnectionQuality('poor'));
+    video.addEventListener('playing', () => updateConnectionQuality());
+    
+    // Adicionar listeners para fullscreen com suporte a prefixos
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
@@ -352,10 +525,19 @@ export function useVideoPlayer() {
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('progress', handleProgress);
+      video.removeEventListener('loadeddata', updateConnectionQuality);
+      video.removeEventListener('canplaythrough', updateConnectionQuality);
+      video.removeEventListener('waiting', () => setConnectionQuality('poor'));
+      video.removeEventListener('playing', () => updateConnectionQuality());
+      
+      // Remover listeners de fullscreen
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
       stopWatchTimeTracking(true); // Salvar tempo ao desmontar
     };
-  }, [videos, currentVideoIndex, incrementViews, startWatchTimeTracking, stopWatchTimeTracking, saveWatchTime]);
+  }, [videos, currentVideoIndex, incrementViews, startWatchTimeTracking, stopWatchTimeTracking, saveWatchTime, updateConnectionQuality]);
 
   // Parar e salvar rastreamento quando o vídeo muda
   useEffect(() => {
@@ -366,6 +548,7 @@ export function useVideoPlayer() {
   }, [currentVideoIndex, stopWatchTimeTracking]);
 
   // Salvar watch_time quando sair da página (beforeunload) ou aba ficar oculta
+  // IMPORTANTE: Continuar contando watch time mesmo quando a aba não está focada
   useEffect(() => {
     const handleBeforeUnload = () => {
       // Salvar tempo assistido ao sair da página (não podemos esperar pela promise)
@@ -385,11 +568,67 @@ export function useVideoPlayer() {
     };
 
     const handleVisibilityChange = () => {
-      // Salvar quando a aba ficar oculta (pode aguardar a promise)
+      const video = videoRef.current;
+      if (!video || !currentTrackingVideoIdRef.current) return;
+
       if (document.hidden) {
-        saveWatchTime();
+        // Quando a aba fica oculta, salvar o tempo até agora
+        // Marcar se estava tocando para continuar contando
+        wasPlayingWhenHiddenRef.current = !video.paused;
+        if (wasPlayingWhenHiddenRef.current) {
+          saveWatchTime();
+        }
+      } else {
+        // Quando volta a ficar visível, atualizar timestamp para continuar contando
+        // Se estava tocando quando perdeu foco e ainda não terminou, continuar
+        if (wasPlayingWhenHiddenRef.current && !video.ended) {
+          lastWatchTimeUpdateRef.current = Date.now();
+          lastVideoTimeRef.current = video.currentTime || 0;
+          // Se o vídeo foi pausado pelo navegador, não fazer nada
+          // Se ainda está tocando, continuar rastreamento
+          if (!video.paused) {
+            wasPlayingWhenHiddenRef.current = true;
+          }
+        }
       }
     };
+
+    // Continuar contando watch time mesmo quando a aba não está focada
+    // Usar um intervalo separado que verifica o currentTime do vídeo
+    const backgroundWatchTimeInterval = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || !currentTrackingVideoIdRef.current) return;
+
+      // Verificar se o vídeo ainda é o mesmo pela URL
+      const currentUrl = video.src || video.currentSrc;
+      if (currentVideoUrlRef.current && currentUrl !== currentVideoUrlRef.current) {
+        return; // Vídeo mudou
+      }
+
+      // Continuar contando mesmo se a aba não estiver focada
+      // Usar o currentTime do vídeo para calcular o tempo real assistido
+      if (currentTrackingVideoIdRef.current && !video.ended && wasPlayingWhenHiddenRef.current) {
+        const currentVideoTime = video.currentTime || 0;
+        const timeElapsed = currentVideoTime - lastVideoTimeRef.current;
+        
+        // Se o tempo do vídeo avançou, contar (mesmo que esteja pausado pelo navegador)
+        // Isso permite contar o tempo que o vídeo estava tocando antes de perder foco
+        if (timeElapsed > 0) {
+          const now = Date.now();
+          const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
+
+          // Atualizar a cada 10 segundos quando em background
+          if (elapsedSeconds >= 10) {
+            // Usar o tempo real do vídeo
+            incrementWatchTime(currentTrackingVideoIdRef.current, timeElapsed).catch(() => {
+              // Ignorar erros em background
+            });
+            lastWatchTimeUpdateRef.current = now;
+            lastVideoTimeRef.current = currentVideoTime;
+          }
+        }
+      }
+    }, 10000); // Verificar a cada 10 segundos quando em background
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -397,6 +636,7 @@ export function useVideoPlayer() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(backgroundWatchTimeInterval);
       // Também salvar ao desmontar o componente
       saveWatchTime();
     };
@@ -437,10 +677,15 @@ export function useVideoPlayer() {
 
   return {
     videoRef,
+    playerContainerRef,
     isPlaying,
     currentTime,
     duration,
     volume,
+    playbackRate,
+    quality,
+    bufferedRanges,
+    connectionQuality,
     isFullscreen,
     isLoading,
     loadProgress,
@@ -455,6 +700,8 @@ export function useVideoPlayer() {
     changeVolume,
     increaseVolume,
     decreaseVolume,
+    changePlaybackRate,
+    changeQuality,
     toggleFullscreen,
     nextVideo,
     previousVideo,

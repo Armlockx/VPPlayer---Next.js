@@ -17,7 +17,7 @@ export function ContinueWatching() {
   }
 
   return (
-    <section style={{ marginBottom: '40px', padding: '0 24px' }}>
+    <section style={{ marginBottom: '40px', padding: '18px 24px 0px' }}>
       <h2
         style={{
           margin: '0 0 20px 0',
@@ -54,7 +54,8 @@ export function ContinueWatching() {
               onClick={() => router.push(`/watch/${item.video!.id}`)}
               style={{
                 cursor: 'pointer',
-                minWidth: '280px',
+                width: '280px',
+                flexShrink: 0,
                 transition: 'transform 0.2s ease',
               }}
               onMouseEnter={(e) => {
@@ -84,6 +85,11 @@ export function ContinueWatching() {
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
+                      display: 'block',
+                    }}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
                     }}
                   />
                 ) : (

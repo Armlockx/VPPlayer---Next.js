@@ -32,16 +32,67 @@ export function VideoPlayerPage({ videoId }: VideoPlayerPageProps = {} as VideoP
   const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const progressSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedTimeRef = useRef<number>(0);
+  const lastLoadedVideoIdRef = useRef<string | null>(null);
+  const isLoadingVideoRef = useRef<boolean>(false);
 
   // Carregar vídeo específico se videoId for fornecido
   useEffect(() => {
-    if (videoId && player.videos.length > 0) {
-      const videoIndex = player.videos.findIndex(v => v.id === videoId);
-      if (videoIndex !== -1 && player.currentVideoIndex !== videoIndex) {
-        player.playVideo(videoIndex);
-      }
+    if (!videoId || player.videos.length === 0) return;
+    
+    // Evitar loop: verificar se já está carregando este vídeo específico
+    if (isLoadingVideoRef.current && lastLoadedVideoIdRef.current === videoId) {
+      console.log(`⏸️ Já está carregando este vídeo (${videoId}), ignorando...`);
+      return;
     }
-  }, [videoId, player.videos.length, player]);
+    
+    const videoIndex = player.videos.findIndex(v => v.id === videoId);
+    if (videoIndex === -1) {
+      console.warn(`⚠️ Vídeo não encontrado: ${videoId}`);
+      return;
+    }
+    
+    // Verificar se o vídeo atual é diferente do que queremos carregar
+    const currentVideo = player.currentVideo;
+    const currentVideoId = currentVideo?.id;
+    
+    // Se já carregou este vídeo e é o atual, não recarregar
+    if (lastLoadedVideoIdRef.current === videoId && currentVideoId === videoId) {
+      console.log(`✅ Vídeo ${videoId} já foi carregado, verificando se está tocando...`);
+      
+      // Verificar se o vídeo realmente está tocando
+      const videoElement = player.videoRef?.current;
+      const isActuallyPlaying = videoElement && !videoElement.paused && !videoElement.ended && videoElement.currentTime > 0;
+      
+      if (!isActuallyPlaying && videoElement && videoElement.readyState >= 1) {
+        console.log(`▶️ Vídeo carregado mas não está tocando, tentando play...`);
+        videoElement.play().catch((error: any) => {
+          console.log(`⏸️ Não foi possível fazer play: ${error.message}`);
+        });
+      }
+      return; // Não recarregar
+    }
+    
+    // Carregar vídeo diferente
+    console.log(`🎬 Carregando vídeo: ${videoId} (índice: ${videoIndex})`);
+    console.log(`📊 Estado atual - currentVideoIndex: ${player.currentVideoIndex}, currentVideoId: ${currentVideoId}`);
+    
+    isLoadingVideoRef.current = true;
+    lastLoadedVideoIdRef.current = videoId;
+    
+    // Usar setTimeout para evitar que mudanças de estado disparem o useEffect novamente
+    const timeoutId = setTimeout(() => {
+      player.playVideo(videoIndex).finally(() => {
+        // Resetar flag após um delay
+        setTimeout(() => {
+          isLoadingVideoRef.current = false;
+        }, 2000);
+      });
+    }, 0);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [videoId, player.videos.length]);
 
   // Não mostrar modal de auth automaticamente - login é opcional
   // Removido o useEffect que forçava o modal

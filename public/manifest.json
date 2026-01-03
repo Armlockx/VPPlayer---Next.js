@@ -1,7 +1,7 @@
 {
   "name": "👌vPlay",
   "short_name": "👌vPlay",
-  "description": "Plataforma de vídeos estilo Netflix com integração Supabase",
+  "description": "👌vPlay",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

@@ -46,6 +46,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Ignorar requisições com schemes não suportados (chrome-extension, etc)
+  const url = new URL(event.request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
   // Ignorar requisições para APIs externas
   if (event.request.url.includes('supabase.co') || 
       event.request.url.includes('googletagmanager.com') ||
@@ -56,14 +62,30 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clonar a resposta
-        const responseToCache = response.clone();
+        // Verificar novamente se é uma requisição válida antes de fazer cache
+        const requestUrl = new URL(event.request.url);
+        const isValidRequest = 
+          (requestUrl.protocol === 'http:' || requestUrl.protocol === 'https:') &&
+          !requestUrl.href.includes('chrome-extension:') &&
+          !requestUrl.href.includes('chrome://') &&
+          !requestUrl.href.includes('moz-extension:') &&
+          response.status === 200 &&
+          response.type !== 'error';
 
-        // Adicionar ao cache se for uma requisição válida
-        if (response.status === 200) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+        // Adicionar ao cache apenas se for uma requisição válida
+        if (isValidRequest) {
+          try {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache).catch((error) => {
+                // Ignorar erros de cache silenciosamente
+                console.warn('Service Worker: Erro ao fazer cache:', error);
+              });
+            });
+          } catch (error) {
+            // Ignorar erros de clonagem silenciosamente
+            console.warn('Service Worker: Erro ao clonar resposta:', error);
+          }
         }
 
         return response;

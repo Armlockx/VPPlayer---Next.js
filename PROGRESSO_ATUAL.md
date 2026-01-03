@@ -2,9 +2,9 @@
 
 ## ✅ Status Geral
 
-**Progresso Total:** 10/130 itens (7.7%)  
+**Progresso Total:** 13/130 itens (10%)  
 **Alta Prioridade:** 10/25 (40%) ✅  
-**Média Prioridade:** 0/45 (0%)  
+**Média Prioridade:** 3/45 (6.7%) ✅  
 **Baixa Prioridade:** 0/60 (0%)
 
 ---
@@ -36,6 +36,11 @@
 - ✅ **Scrollbar customizada** (estilo moderno com gradiente vermelho)
 - ✅ **Nome do projeto atualizado** para "👌vPlay"
 - ✅ **Correções de bugs** (views, watch time, fullscreen)
+
+### 💬 Interação Social Melhorada ✅
+- ✅ **Respostas a comentários (threads)** - Sistema de comentários aninhados
+- ✅ **Editar próprios comentários** - Edição inline de comentários
+- ✅ **Timestamps em comentários** - Links clicáveis para momentos específicos do vídeo
 
 ---
 
@@ -86,13 +91,6 @@
 - **Impacto:** Melhor descoberta de conteúdo
 - **Complexidade:** Média
 
-#### 5. 💬 Interação Social Melhorada
-- [ ] Respostas a comentários (threads)
-- [ ] Editar próprios comentários
-- [ ] Timestamps em comentários
-- **Impacto:** Maior engajamento
-- **Complexidade:** Média-Alta
-
 ---
 
 ## 🎯 Roadmap Sugerido
@@ -104,10 +102,12 @@
 - 🔄 **Próximo:** Favoritos e Watchlist
 - 🔄 **Depois:** Acessibilidade básica
 
-### Fase 2: Engajamento (0% Completo)
-- Sistema de playlists
-- Busca avançada
-- Respostas a comentários
+### Fase 2: Engajamento (✅ 20% Completo)
+- ✅ Respostas a comentários (threads)
+- ✅ Editar comentários
+- ✅ Timestamps em comentários
+- 🔄 **Próximo:** Sistema de playlists
+- 🔄 **Depois:** Busca avançada
 - Dashboard pessoal
 - Categorias e tags
 
@@ -126,6 +126,7 @@
 - ✅ Histórico completo funcionando
 - ✅ Player com controles avançados
 - ✅ UI/UX melhorada (scrollbar, visual)
+- ✅ Sistema de comentários com threads, edição e timestamps
 
 ### Próximos Objetivos:
 - [ ] Taxa de retenção de usuários

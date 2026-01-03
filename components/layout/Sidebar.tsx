@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface SidebarProps {
@@ -10,6 +10,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const auth = useAuth();
 
   const menuItems = [
@@ -19,10 +20,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   ];
 
   const userItems = [
-    { icon: 'bi-clock-history', label: 'Histórico', path: '#' },
-    { icon: 'bi-play-circle', label: 'Playlists', path: '#' },
-    { icon: 'bi-clock', label: 'Assistir mais tarde', path: '#' },
-    { icon: 'bi-hand-thumbs-up', label: 'Vídeos com Gostei', path: '#' },
+    { icon: 'bi-heart-fill', label: 'Favoritos', path: '/favorites' },
+    { icon: 'bi-clock-history', label: 'Histórico', path: '/history' },
+    { icon: 'bi-clock', label: 'Assistir mais tarde', path: '/watchlist' },
+    { icon: 'bi-hand-thumbs-up', label: 'Vídeos com Gostei', path: '/liked' },
   ];
 
   if (!isOpen) return null;
@@ -39,32 +40,45 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       zIndex: 90,
       padding: '12px 0'
     }}>
-      {menuItems.map((item, index) => (
-        <div
-          key={index}
-          onClick={() => item.path !== '#' && router.push(item.path)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '12px 24px',
-            cursor: item.path !== '#' ? 'pointer' : 'default',
-            color: 'white',
-            fontSize: '14px',
-            gap: '24px'
-          }}
-          onMouseEnter={(e) => {
-            if (item.path !== '#') {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}
-        >
-          <i className={`bi ${item.icon}`} style={{ fontSize: '20px' }}></i>
-          <span>{item.label}</span>
-        </div>
-      ))}
+      {menuItems.map((item, index) => {
+        // Para rota inicial, verificar se é exatamente '/' (não outras rotas)
+        // Para outras rotas, verificar se corresponde exatamente ou começa com o path
+        const isActive = item.path === '/' 
+          ? pathname === '/' || pathname === ''
+          : pathname === item.path || (item.path !== '#' && pathname.startsWith(item.path + '/'));
+        return (
+          <div
+            key={index}
+            onClick={() => item.path !== '#' && router.push(item.path)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px 24px',
+              cursor: item.path !== '#' ? 'pointer' : 'default',
+              color: isActive ? '#e50914' : 'white',
+              fontSize: '14px',
+              gap: '24px',
+              background: isActive ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
+              borderLeft: isActive ? '3px solid #e50914' : '3px solid transparent',
+              fontWeight: isActive ? 600 : 400,
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (item.path !== '#' && !isActive) {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive) {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <i className={`bi ${item.icon}`} style={{ fontSize: '20px', color: isActive ? '#e50914' : 'white' }}></i>
+            <span>{item.label}</span>
+          </div>
+        );
+      })}
 
       {auth.isAuthenticated && (
         <>
@@ -78,32 +92,42 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             VOCÊ
           </div>
 
-          {userItems.map((item, index) => (
-            <div
-              key={index}
-              onClick={() => item.path !== '#' && router.push(item.path)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px 24px',
-                cursor: item.path !== '#' ? 'pointer' : 'default',
-                color: 'white',
-                fontSize: '14px',
-                gap: '24px'
-              }}
-              onMouseEnter={(e) => {
-                if (item.path !== '#') {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <i className={`bi ${item.icon}`} style={{ fontSize: '20px' }}></i>
-              <span>{item.label}</span>
-            </div>
-          ))}
+          {userItems.map((item, index) => {
+            // Verificar se a rota atual corresponde ao item (exato ou começa com o path)
+            const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+            return (
+              <div
+                key={index}
+                onClick={() => item.path !== '#' && router.push(item.path)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 24px',
+                  cursor: item.path !== '#' ? 'pointer' : 'default',
+                  color: isActive ? '#e50914' : 'white',
+                  fontSize: '14px',
+                  gap: '24px',
+                  background: isActive ? 'rgba(229, 9, 20, 0.15)' : 'transparent',
+                  borderLeft: isActive ? '3px solid #e50914' : '3px solid transparent',
+                  fontWeight: isActive ? 600 : 400,
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (item.path !== '#' && !isActive) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent';
+                  }
+                }}
+              >
+                <i className={`bi ${item.icon}`} style={{ fontSize: '20px', color: isActive ? '#e50914' : 'white' }}></i>
+                <span>{item.label}</span>
+              </div>
+            );
+          })}
         </>
       )}
     </aside>

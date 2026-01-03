@@ -22,8 +22,54 @@ interface StatCard {
   borderColor: string;
 }
 
-function AnimatedNumber({ value }: { value: number }) {
-  return <span style={{ animation: 'countUp 0.3s ease' }}>{value.toLocaleString()}</span>;
+function AnimatedNumber({ value, previousValue }: { value: number; previousValue?: number }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    if (previousValue !== undefined && value !== previousValue) {
+      setIsUpdating(true);
+      // Animação suave de contagem
+      const duration = 500; // 500ms
+      const startValue = previousValue;
+      const endValue = value;
+      const startTime = Date.now();
+
+      const animate = () => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.floor(startValue + (endValue - startValue) * easeOut);
+        
+        setDisplayValue(currentValue);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          setDisplayValue(endValue);
+          setIsUpdating(false);
+        }
+      };
+
+      requestAnimationFrame(animate);
+    } else {
+      setDisplayValue(value);
+    }
+  }, [value, previousValue]);
+
+  return (
+    <span
+      style={{
+        animation: isUpdating ? 'pulse 0.5s ease' : 'none',
+        transition: 'all 0.3s ease',
+      }}
+    >
+      {displayValue.toLocaleString()}
+    </span>
+  );
 }
 
 export function StatsPanel() {
@@ -34,16 +80,17 @@ export function StatsPanel() {
     totalUsers: 0,
     totalAdmins: 0,
   });
+  const [previousStats, setPreviousStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const supabase = createClient();
-
-  useEffect(() => {
-    loadStats();
-  }, []);
 
   const loadStats = async () => {
     try {
-      setLoading(true);
+      // Não mostrar loading após o primeiro carregamento para evitar flicker
+      if (!lastUpdate) {
+        setLoading(true);
+      }
 
       // Estatísticas de vídeos
       const { count: videosCount } = await supabase.from('videos').select('*', { count: 'exact', head: true });
@@ -61,19 +108,43 @@ export function StatsPanel() {
         .select('*', { count: 'exact', head: true })
         .eq('is_admin', true);
 
-      setStats({
+      const newStats = {
         totalVideos: videosCount || 0,
         totalViews,
         totalWatchTime,
         totalUsers: usersCount || 0,
         totalAdmins: adminsCount || 0,
-      });
+      };
+      
+      // Salvar stats anteriores antes de atualizar
+      setPreviousStats(stats);
+      setStats(newStats);
+      
+      // Atualizar timestamp da última atualização
+      setLastUpdate(new Date());
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Carregar estatísticas inicialmente e a cada 5 segundos
+  useEffect(() => {
+    // Carregar imediatamente
+    loadStats();
+
+    // Configurar intervalo para atualizar a cada 5 segundos
+    const interval = setInterval(() => {
+      loadStats();
+    }, 5000); // 5000ms = 5 segundos
+
+    // Limpar intervalo ao desmontar componente
+    return () => {
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Executar apenas uma vez na montagem
 
   const formatWatchTime = (seconds: number): string => {
     if (!seconds || seconds < 0) return '0s';
@@ -144,18 +215,55 @@ export function StatsPanel() {
         animation: 'slideInUp 0.4s ease 0.1s both',
       }}
     >
-      <h2
+      <div
         style={{
-          margin: '0 0 20px 0',
-          fontSize: '24px',
-          fontWeight: 600,
-          color: '#ffffff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '20px',
           paddingBottom: '15px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
-        Estatísticas Gerais
-      </h2>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: '24px',
+            fontWeight: 600,
+            color: '#ffffff',
+          }}
+        >
+          Estatísticas Gerais
+        </h2>
+        {lastUpdate && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: 'rgba(255, 255, 255, 0.5)',
+            }}
+          >
+            <div
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#22c55e',
+                animation: 'pulse 2s infinite',
+              }}
+            />
+            <span>
+              Atualizado: {lastUpdate.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
+            </span>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div
@@ -228,7 +336,29 @@ export function StatsPanel() {
                   justifyContent: 'center',
                 }}
               >
-                {typeof card.value === 'number' ? <AnimatedNumber value={card.value} /> : card.value}
+                {typeof card.value === 'number' ? (
+                  <AnimatedNumber 
+                    value={card.value} 
+                    previousValue={previousStats ? (
+                      card.label === 'Total de Vídeos' ? previousStats.totalVideos :
+                      card.label === 'Total de Visualizações' ? previousStats.totalViews :
+                      card.label === 'Total de Usuários' ? previousStats.totalUsers :
+                      card.label === 'Administradores' ? previousStats.totalAdmins :
+                      undefined
+                    ) : undefined}
+                  />
+                ) : (
+                  <span 
+                    style={{ 
+                      animation: lastUpdate && previousStats && previousStats.totalWatchTime !== stats.totalWatchTime 
+                        ? 'pulse 0.5s ease' 
+                        : 'none',
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    {card.value}
+                  </span>
+                )}
               </div>
               <div
                 style={{

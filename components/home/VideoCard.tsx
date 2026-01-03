@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useVideoHistory } from '@/lib/hooks/useVideoHistory';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useFavorites } from '@/lib/hooks/useFavorites';
+import { useState } from 'react';
 import type { Video } from '@/types/video';
 
 interface VideoCardProps {
@@ -13,10 +15,34 @@ export function VideoCard({ video }: VideoCardProps) {
   const router = useRouter();
   const history = useVideoHistory();
   const auth = useAuth();
+  const favorites = useFavorites();
+  const [isHovered, setIsHovered] = useState(false);
   
   const isCompleted = auth.isAuthenticated && !auth.isGuest 
     ? history.isVideoCompleted(video.id)
     : false;
+  
+  const isFavorite = auth.isAuthenticated && !auth.isGuest
+    ? favorites.isFavorite(video.id)
+    : false;
+  
+  const isInWatchlist = auth.isAuthenticated && !auth.isGuest
+    ? favorites.isInWatchlist(video.id)
+    : false;
+  
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (auth.isAuthenticated && !auth.isGuest) {
+      await favorites.toggleFavorite(video.id);
+    }
+  };
+  
+  const handleWatchlistClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (auth.isAuthenticated && !auth.isGuest) {
+      await favorites.toggleWatchlist(video.id);
+    }
+  };
 
   const handleClick = () => {
     router.push(`/watch/${video.id}`);
@@ -35,13 +61,16 @@ export function VideoCard({ video }: VideoCardProps) {
       onClick={handleClick}
       style={{
         cursor: 'pointer',
-        transition: 'transform 0.2s ease'
+        transition: 'transform 0.2s ease',
+        position: 'relative',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'scale(1.02)';
+        setIsHovered(true);
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'scale(1)';
+        setIsHovered(false);
       }}
     >
       {/* Thumbnail */}
@@ -114,9 +143,81 @@ export function VideoCard({ video }: VideoCardProps) {
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
+            zIndex: 2,
           }}>
             <i className="bi bi-arrow-clockwise" style={{ fontSize: '10px' }}></i>
             Assistir de novo
+          </div>
+        )}
+
+        {/* Botões de ação (favoritar/watchlist) */}
+        {auth.isAuthenticated && !auth.isGuest && isHovered && (
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            display: 'flex',
+            gap: '8px',
+            zIndex: 3,
+          }}>
+            <button
+              onClick={handleFavoriteClick}
+              style={{
+                background: isFavorite ? 'rgba(229, 9, 20, 0.9)' : 'rgba(0, 0, 0, 0.7)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'white',
+                fontSize: '16px',
+                transition: 'all 0.2s ease',
+                backdropFilter: 'blur(10px)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.background = isFavorite ? 'rgba(229, 9, 20, 1)' : 'rgba(0, 0, 0, 0.9)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.background = isFavorite ? 'rgba(229, 9, 20, 0.9)' : 'rgba(0, 0, 0, 0.7)';
+              }}
+              title={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            >
+              <i className={`bi ${isFavorite ? 'bi-heart-fill' : 'bi-heart'}`}></i>
+            </button>
+            <button
+              onClick={handleWatchlistClick}
+              style={{
+                background: isInWatchlist ? 'rgba(255, 193, 7, 0.9)' : 'rgba(0, 0, 0, 0.7)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'white',
+                fontSize: '16px',
+                transition: 'all 0.2s ease',
+                backdropFilter: 'blur(10px)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.background = isInWatchlist ? 'rgba(255, 193, 7, 1)' : 'rgba(0, 0, 0, 0.9)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.background = isInWatchlist ? 'rgba(255, 193, 7, 0.9)' : 'rgba(0, 0, 0, 0.7)';
+              }}
+              title={isInWatchlist ? 'Remover da watchlist' : 'Adicionar à watchlist'}
+            >
+              <i className={`bi ${isInWatchlist ? 'bi-bookmark-fill' : 'bi-bookmark'}`}></i>
+            </button>
           </div>
         )}
       </div>

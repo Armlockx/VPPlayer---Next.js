@@ -16,7 +16,7 @@ export function VideoGrid({ videos, loading }: VideoGridProps) {
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '16px',
         padding: '24px',
-        maxWidth: '1400px',
+        maxWidth: '100%',
         margin: '0 auto'
       }}>
         {[...Array(9)].map((_, i) => (
@@ -52,7 +52,7 @@ export function VideoGrid({ videos, loading }: VideoGridProps) {
       gridTemplateColumns: 'repeat(3, 1fr)',
       gap: '40px 16px',
       padding: '24px',
-      maxWidth: '1400px',
+      maxWidth: '100%',
       margin: '0 auto'
     }}>
       {videos.map((video) => (

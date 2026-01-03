@@ -31,6 +31,8 @@ export function useVideoPlayer() {
   const currentTrackingVideoIdRef = useRef<string | null>(null);
   const currentVideoUrlRef = useRef<string | null>(null); // Rastrear URL do vídeo atual
   const wasPlayingWhenHiddenRef = useRef<boolean>(false); // Se estava tocando quando perdeu foco
+  const accumulatedWatchTimeRef = useRef<number>(0); // Tempo acumulado desde a última atualização no banco
+  const isTrackingRef = useRef<boolean>(false); // Se está rastreando ativamente
 
   const supabase = createClient();
 
@@ -217,7 +219,7 @@ export function useVideoPlayer() {
     }
   }, [supabase]);
 
-  // Função para incrementar watch_time
+  // Função para incrementar watch_time no banco
   const incrementWatchTime = useCallback(async (videoId: string, seconds: number) => {
     if (!videoId || seconds <= 0) {
       return;
@@ -234,7 +236,7 @@ export function useVideoPlayer() {
         return;
       }
 
-      console.log(`Watch_time incrementado para vídeo ${videoId}: +${seconds}s, Total:`, data);
+      console.log(`✅ Watch_time salvo no banco para vídeo ${videoId}: +${seconds.toFixed(2)}s, Total:`, data);
 
       // Atualizar lista de vídeos localmente
       setVideos((prev) =>
@@ -245,11 +247,60 @@ export function useVideoPlayer() {
         )
       );
 
+      // Resetar acumulador após salvar
+      accumulatedWatchTimeRef.current = 0;
       lastWatchTimeUpdateRef.current = Date.now();
     } catch (error) {
       console.error('Erro ao incrementar watch_time:', error);
     }
   }, [supabase]);
+
+  // Função para salvar watch_time acumulado no banco
+  const saveAccumulatedWatchTime = useCallback(async (force: boolean = false) => {
+    const video = videoRef.current;
+    // Verificar se tudo está pronto - retornar silenciosamente se não estiver
+    if (!video || !currentTrackingVideoIdRef.current || !isTrackingRef.current) {
+      return; // Não logar warnings desnecessários
+    }
+
+    // Se está tocando, atualizar acumulador antes de salvar
+    // IMPORTANTE: Só contar tempo quando o vídeo está realmente tocando (não pausado)
+    if (!video.paused && !video.ended) {
+      const currentVideoTime = video.currentTime || 0;
+      const timeElapsed = currentVideoTime - lastVideoTimeRef.current;
+      
+      // Só contar se o tempo avançou (vídeo está realmente tocando)
+      if (timeElapsed > 0) {
+        accumulatedWatchTimeRef.current += timeElapsed;
+        lastVideoTimeRef.current = currentVideoTime;
+        const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+        console.log(`📊 [${timestamp}] Tempo acumulado: +${timeElapsed.toFixed(2)}s (Total acumulado: ${accumulatedWatchTimeRef.current.toFixed(2)}s, vídeo em: ${currentVideoTime.toFixed(1)}s)`);
+      } else {
+        const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+        console.log(`⏸️ [${timestamp}] Vídeo não avançou (pode estar pausado ou travado). Último tempo: ${lastVideoTimeRef.current.toFixed(1)}s, Atual: ${currentVideoTime.toFixed(1)}s`);
+      }
+    } else {
+      const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+      console.log(`⏸️ [${timestamp}] Vídeo pausado ou finalizado (paused: ${video.paused}, ended: ${video.ended}). Acumulado: ${accumulatedWatchTimeRef.current.toFixed(2)}s`);
+    }
+    // Se está pausado, não acumular tempo, mas manter o que já foi acumulado
+
+    // Salvar no banco se acumulou pelo menos 5 segundos ou se for forçado
+    const shouldSave = force || accumulatedWatchTimeRef.current >= 5;
+    
+    if (shouldSave && accumulatedWatchTimeRef.current > 0) {
+      const timeToSave = accumulatedWatchTimeRef.current;
+      const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+      console.log(`💾 [${timestamp}] ✅ Salvando watch time no banco: ${timeToSave.toFixed(2)}s (forçado: ${force})`);
+      await incrementWatchTime(currentTrackingVideoIdRef.current, timeToSave);
+    } else if (accumulatedWatchTimeRef.current > 0) {
+      const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+      console.log(`⏳ [${timestamp}] Aguardando mais tempo... (${accumulatedWatchTimeRef.current.toFixed(2)}s acumulado, precisa de 5s)`);
+    } else {
+      const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+      console.log(`⏳ [${timestamp}] Nenhum tempo acumulado ainda...`);
+    }
+  }, [incrementWatchTime]);
 
   // Iniciar rastreamento de watch_time
   const startWatchTimeTracking = useCallback((videoId: string) => {
@@ -264,80 +315,42 @@ export function useVideoPlayer() {
     const video = videoRef.current;
     if (!video) return;
 
+    console.log(`🎬 Iniciando rastreamento de watch time para vídeo: ${videoId}`);
+    
     currentTrackingVideoIdRef.current = videoId;
     lastWatchTimeUpdateRef.current = Date.now();
     lastVideoTimeRef.current = video.currentTime || 0;
+    accumulatedWatchTimeRef.current = 0;
+    isTrackingRef.current = true;
     wasPlayingWhenHiddenRef.current = !video.paused;
 
-    // Atualizar watch_time a cada 5 segundos
-    // IMPORTANTE: Continuar contando mesmo quando a aba não está focada
+    // Salvar watch_time no banco a cada 5 segundos enquanto está tocando
     watchTimeIntervalRef.current = setInterval(() => {
       const video = videoRef.current;
-      if (!video) return;
-
-      // Verificar se ainda estamos rastreando o mesmo vídeo
-      // Verificar pela URL também para garantir que é o vídeo correto
-      const currentUrl = video.src || video.currentSrc;
-      if (currentVideoUrlRef.current && currentUrl !== currentVideoUrlRef.current) {
-        // Vídeo mudou, parar rastreamento
-        return;
+      // Verificar se tudo está pronto antes de tentar salvar
+      if (!video || !currentTrackingVideoIdRef.current || !isTrackingRef.current) {
+        return; // Não logar warning aqui, apenas retornar silenciosamente
       }
-
-      // Continuar contando mesmo se a aba não estiver focada
-      // Usar o currentTime do vídeo para calcular o tempo real assistido
-      if (currentTrackingVideoIdRef.current === videoId && !video.ended) {
-        const currentVideoTime = video.currentTime || 0;
-        const timeElapsed = currentVideoTime - lastVideoTimeRef.current;
-        
-        // Só contar se o tempo avançou (vídeo estava tocando)
-        // Se estava tocando quando perdeu foco, continuar contando
-        if (timeElapsed > 0 || wasPlayingWhenHiddenRef.current) {
-          const now = Date.now();
-          const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
-
-          // Atualizar se passaram pelo menos 5 segundos
-          if (elapsedSeconds >= 5) {
-            // Usar o tempo real do vídeo (currentTime) como base
-            // Isso garante que contamos apenas o tempo que o vídeo realmente avançou
-            const timeToCount = timeElapsed > 0 ? timeElapsed : elapsedSeconds;
-            
-            if (timeToCount > 0) {
-              incrementWatchTime(videoId, timeToCount).catch((error) => {
-                console.error('Erro ao incrementar watch_time no intervalo:', error);
-              });
-              lastWatchTimeUpdateRef.current = now;
-              lastVideoTimeRef.current = currentVideoTime;
-            }
-          }
-        }
+      
+      if (!video.paused && !video.ended) {
+        console.log(`⏱️ [${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] Intervalo de 5s: Verificando watch time (acumulado: ${accumulatedWatchTimeRef.current.toFixed(2)}s)`);
+        saveAccumulatedWatchTime(false); // false = só salvar se acumulou >= 5s
       }
     }, 5000); // Verificar a cada 5 segundos
-  }, [incrementWatchTime]);
-
-  // Função auxiliar para salvar tempo assistido
-  const saveWatchTime = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video || !currentTrackingVideoIdRef.current) return;
-
-    const now = Date.now();
-    const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
     
-    // Salvar se tiver pelo menos 0.1 segundos (para evitar salvar valores muito pequenos)
-    if (elapsedSeconds > 0.1) {
-      try {
-        await incrementWatchTime(currentTrackingVideoIdRef.current, elapsedSeconds);
-        lastWatchTimeUpdateRef.current = now;
-      } catch (error) {
-        console.error('Erro ao salvar watch_time:', error);
-      }
-    }
-  }, [incrementWatchTime]);
+    console.log(`✅ Rastreamento iniciado. Intervalo configurado para 5 segundos.`);
+  }, [saveAccumulatedWatchTime]);
+
+  // Função auxiliar para salvar tempo assistido (força salvamento imediato)
+  const saveWatchTime = useCallback(async () => {
+    await saveAccumulatedWatchTime(true); // true = forçar salvamento mesmo se < 5s
+  }, [saveAccumulatedWatchTime]);
 
   // Parar rastreamento de watch_time
-  const stopWatchTimeTracking = useCallback((saveRemainingTime: boolean = true) => {
+  const stopWatchTimeTracking = useCallback(async (saveRemainingTime: boolean = true) => {
     // Salvar tempo restante antes de parar (se solicitado)
     if (saveRemainingTime) {
-      saveWatchTime();
+      await saveWatchTime();
     }
 
     if (watchTimeIntervalRef.current) {
@@ -345,20 +358,28 @@ export function useVideoPlayer() {
       watchTimeIntervalRef.current = null;
     }
 
+    isTrackingRef.current = false;
     currentTrackingVideoIdRef.current = null;
+    accumulatedWatchTimeRef.current = 0;
   }, [saveWatchTime]);
 
   const nextVideo = useCallback(async () => {
     if (currentVideoIndex < videos.length - 1) {
-      stopWatchTimeTracking();
+      await stopWatchTimeTracking();
       const nextIndex = currentVideoIndex + 1;
+      const nextVideo = videos[nextIndex];
       setCurrentVideoIndex(nextIndex);
       if (videoRef.current) {
-        videoRef.current.src = videos[nextIndex].url;
-        currentVideoUrlRef.current = videos[nextIndex].url; // Atualizar URL atual
+        videoRef.current.src = nextVideo.url;
+        currentVideoUrlRef.current = nextVideo.url; // Atualizar URL atual
+        
+        // NÃO iniciar rastreamento aqui - esperar pelo evento 'play'
+        // Isso evita iniciar duas vezes
+        
         try {
           await videoRef.current.play();
           setIsPlaying(true);
+          // O rastreamento será iniciado no handlePlay
         } catch (error) {
           // Autoplay bloqueado
           setIsPlaying(false);
@@ -369,15 +390,21 @@ export function useVideoPlayer() {
 
   const previousVideo = useCallback(async () => {
     if (currentVideoIndex > 0) {
-      stopWatchTimeTracking();
+      await stopWatchTimeTracking();
       const prevIndex = currentVideoIndex - 1;
+      const prevVideo = videos[prevIndex];
       setCurrentVideoIndex(prevIndex);
       if (videoRef.current) {
-        videoRef.current.src = videos[prevIndex].url;
-        currentVideoUrlRef.current = videos[prevIndex].url; // Atualizar URL atual
+        videoRef.current.src = prevVideo.url;
+        currentVideoUrlRef.current = prevVideo.url; // Atualizar URL atual
+        
+        // NÃO iniciar rastreamento aqui - esperar pelo evento 'play'
+        // Isso evita iniciar duas vezes
+        
         try {
           await videoRef.current.play();
           setIsPlaying(true);
+          // O rastreamento será iniciado no handlePlay
         } catch (error) {
           // Autoplay bloqueado
           setIsPlaying(false);
@@ -386,21 +413,155 @@ export function useVideoPlayer() {
     }
   }, [currentVideoIndex, videos, stopWatchTimeTracking]);
 
-  const playVideo = useCallback(async (index: number) => {
+  const playVideo = useCallback(async (index: number): Promise<void> => {
     if (index >= 0 && index < videos.length) {
-      stopWatchTimeTracking();
-      setCurrentVideoIndex(index);
+      // Parar rastreamento do vídeo anterior
+      await stopWatchTimeTracking();
+      
+      const video = videos[index];
+      console.log(`🎬 playVideo chamado - Índice: ${index}, Vídeo ID: ${video.id}, URL: ${video.url}`);
+      
       if (videoRef.current) {
-        videoRef.current.src = videos[index].url;
-        currentVideoUrlRef.current = videos[index].url; // Atualizar URL atual
-        try {
-          await videoRef.current.play();
-          setIsPlaying(true);
-        } catch (error) {
-          // Autoplay bloqueado - usuário precisa clicar para iniciar
-          setIsPlaying(false);
+        // Atualizar índice primeiro
+        setCurrentVideoIndex(index);
+        
+        // Verificar se a URL mudou antes de atualizar
+        // Normalizar URLs para comparação (remover query params e fragmentos)
+        const normalizeUrl = (url: string) => {
+          try {
+            const urlObj = new URL(url);
+            return urlObj.origin + urlObj.pathname;
+          } catch {
+            return url;
+          }
+        };
+        
+        const currentSrc = videoRef.current.src || '';
+        const normalizedCurrentSrc = normalizeUrl(currentSrc);
+        const normalizedVideoUrl = normalizeUrl(video.url);
+        
+        // Só recarregar se a URL realmente mudou
+        const needsReload = normalizedCurrentSrc !== normalizedVideoUrl && currentVideoUrlRef.current !== video.url;
+        
+        if (needsReload) {
+          console.log(`📹 Mudando fonte do vídeo de ${currentVideoUrlRef.current} para ${video.url}`);
+          
+          videoRef.current.src = video.url;
+          currentVideoUrlRef.current = video.url;
+          
+          // Carregar o vídeo explicitamente
+          videoRef.current.load();
+          setIsLoading(true);
+          setIsPlaying(false); // Garantir que o estado está correto
+        } else {
+          // URL já está correta, garantir que está atualizada
+          if (currentVideoUrlRef.current !== video.url) {
+            currentVideoUrlRef.current = video.url;
+          }
+          console.log(`✅ Vídeo já está com a URL correta (${video.url}), verificando estado...`);
+          console.log(`📊 Estado do vídeo - readyState: ${videoRef.current.readyState}, paused: ${videoRef.current.paused}, networkState: ${videoRef.current.networkState}`);
+          setIsLoading(false);
+        }
+        
+        // Função para tentar reproduzir o vídeo
+        const tryPlay = async () => {
+          if (!videoRef.current) {
+            console.warn(`⚠️ videoRef.current é null, não é possível fazer play`);
+            return;
+          }
+          
+          const video = videoRef.current;
+          console.log(`🎯 tryPlay chamado - readyState: ${video.readyState}, paused: ${video.paused}, src: ${video.src ? 'definido' : 'vazio'}, networkState: ${video.networkState}`);
+          
+          try {
+            // Verificar se o vídeo já tem metadados carregados
+            if (video.readyState >= 1) {
+              // Vídeo tem metadados ou é o primeiro vídeo, tentar play
+              if (video.paused || video.ended) {
+                if (video.ended) {
+                  video.currentTime = 0;
+                }
+                
+                console.log(`▶️ Tentando play - readyState: ${video.readyState}, paused: ${video.paused}`);
+                await video.play();
+                setIsPlaying(true);
+                setIsLoading(false);
+                console.log(`✅ Vídeo iniciado com sucesso! (readyState: ${video.readyState})`);
+              } else {
+                console.log(`▶️ Vídeo já está tocando`);
+                setIsPlaying(true);
+                setIsLoading(false);
+              }
+            } else {
+              // Aguardar metadados ou dados suficientes
+              console.log(`⏳ Aguardando vídeo carregar metadados (readyState: ${video.readyState})`);
+              
+              const onCanPlay = () => {
+                if (videoRef.current && (videoRef.current.paused || videoRef.current.ended)) {
+                  if (videoRef.current.ended) {
+                    videoRef.current.currentTime = 0;
+                  }
+                  videoRef.current.play().then(() => {
+                    setIsPlaying(true);
+                    setIsLoading(false);
+                    console.log(`▶️ Vídeo iniciado após carregar (readyState: ${videoRef.current?.readyState})`);
+                  }).catch((error: any) => {
+                    console.log(`⏸️ Autoplay bloqueado: ${error.message}`);
+                    setIsPlaying(false);
+                    setIsLoading(false);
+                  });
+                  videoRef.current?.removeEventListener('canplay', onCanPlay);
+                  videoRef.current?.removeEventListener('loadedmetadata', onCanPlay);
+                  videoRef.current?.removeEventListener('canplaythrough', onCanPlay);
+                }
+              };
+              
+              // Adicionar listeners para quando o vídeo estiver pronto
+              video.addEventListener('canplay', onCanPlay, { once: true });
+              video.addEventListener('loadedmetadata', onCanPlay, { once: true });
+              video.addEventListener('canplaythrough', onCanPlay, { once: true });
+              
+              // Timeout de segurança - se não carregar em 5 segundos, permitir interação manual
+              const timeoutId = setTimeout(() => {
+                if (videoRef.current && videoRef.current.paused) {
+                  console.log(`⏱️ Timeout: Vídeo não carregou em tempo hábil, aguardando interação do usuário`);
+                  setIsLoading(false);
+                  videoRef.current?.removeEventListener('canplay', onCanPlay);
+                  videoRef.current?.removeEventListener('loadedmetadata', onCanPlay);
+                  videoRef.current?.removeEventListener('canplaythrough', onCanPlay);
+                }
+              }, 5000);
+              
+              // Limpar timeout se o vídeo começar a tocar
+              const onPlayStart = () => {
+                clearTimeout(timeoutId);
+                videoRef.current?.removeEventListener('play', onPlayStart);
+              };
+              video.addEventListener('play', onPlayStart, { once: true });
+            }
+          } catch (error: any) {
+            // Autoplay bloqueado - usuário precisa clicar para iniciar
+            console.log(`⏸️ Erro ao tentar play: ${error.message}`);
+            console.log(`📊 Estado do vídeo - readyState: ${video.readyState}, networkState: ${video.networkState}, src: ${video.src ? 'definido' : 'vazio'}`);
+            setIsPlaying(false);
+            setIsLoading(false);
+          }
+        };
+        
+        // Sempre tentar play, mas com timing diferente dependendo se precisa recarregar
+        if (!needsReload) {
+          // Não precisa recarregar, tentar play imediatamente
+          console.log(`⚡ Tentando play imediatamente (não precisa recarregar)`);
+          tryPlay();
+        } else {
+          // Precisa recarregar, aguardar um pouco para garantir que o DOM foi atualizado e o vídeo começou a carregar
+          const delay = 200;
+          console.log(`⏳ Aguardando ${delay}ms antes de tentar play (precisa recarregar)`);
+          setTimeout(tryPlay, delay);
         }
       }
+    } else {
+      console.warn(`⚠️ Índice de vídeo inválido: ${index} (total de vídeos: ${videos.length})`);
     }
   }, [videos, stopWatchTimeTracking]);
 
@@ -426,11 +587,25 @@ export function useVideoPlayer() {
     const video = videoRef.current;
     if (!video) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      
+      // Atualizar lastVideoTimeRef para que o cálculo no intervalo seja preciso
+      // Isso garante que o saveAccumulatedWatchTime calcule corretamente o tempo decorrido
+      if (isTrackingRef.current && !video.paused && !video.ended) {
+        // Manter lastVideoTimeRef atualizado para cálculos precisos
+        // O acumulador será atualizado no saveAccumulatedWatchTime a cada 5s
+        const currentVideoTime = video.currentTime || 0;
+        // Não atualizar lastVideoTimeRef aqui, deixar o saveAccumulatedWatchTime fazer isso
+        // para evitar problemas de sincronização
+      }
+    };
     const handleDurationChange = () => setDuration(video.duration);
-    const handlePlay = () => {
+    const handlePlay = async () => {
       setIsPlaying(true);
       wasPlayingWhenHiddenRef.current = true;
+      
+      console.log('▶️ Vídeo iniciado (play)');
       
       // Identificar vídeo atual pela URL do elemento video, não pelo índice
       // Isso garante que sempre pegamos o vídeo correto
@@ -446,26 +621,39 @@ export function useVideoPlayer() {
           incrementViews(currentVideo.id);
         }
 
-        // Se já estava rastreando este vídeo, apenas atualizar o timestamp
-        // Caso contrário, iniciar novo rastreamento
+        // Se o rastreamento ainda não foi iniciado (caso raro), iniciar agora
         if (currentTrackingVideoIdRef.current !== currentVideo.id) {
+          console.log(`🔄 Rastreamento não encontrado no play, iniciando agora para vídeo ${currentVideo.id}`);
           startWatchTimeTracking(currentVideo.id);
         } else {
-          // Continuar rastreamento, apenas atualizar timestamp e currentTime
+          // Continuar rastreamento, apenas atualizar estado de reprodução
+          isTrackingRef.current = true;
           lastWatchTimeUpdateRef.current = Date.now();
           lastVideoTimeRef.current = video.currentTime || 0;
+          console.log(`🔄 Continuando rastreamento para vídeo ${currentVideo.id} (acumulado: ${accumulatedWatchTimeRef.current.toFixed(2)}s)`);
         }
       }
     };
-    const handlePause = () => {
+    const handlePause = async () => {
       setIsPlaying(false);
       wasPlayingWhenHiddenRef.current = false;
       
+      console.log('⏸️ Vídeo pausado');
+      
       // Salvar o tempo assistido quando pausa (mesmo que seja menos de 5 segundos)
-      // Mas só salvar se foi pausado manualmente, não por perda de foco
-      // Verificar se a aba está visível
-      if (!document.hidden) {
-        saveWatchTime();
+      // Isso garante que não perdemos tempo assistido ao pausar
+      if (isTrackingRef.current && currentTrackingVideoIdRef.current) {
+        // Atualizar acumulador com o tempo desde a última atualização
+        const currentVideoTime = video.currentTime || 0;
+        const timeElapsed = currentVideoTime - lastVideoTimeRef.current;
+        if (timeElapsed > 0) {
+          accumulatedWatchTimeRef.current += timeElapsed;
+          lastVideoTimeRef.current = currentVideoTime;
+          console.log(`📊 Tempo acumulado ao pausar: +${timeElapsed.toFixed(2)}s (Total: ${accumulatedWatchTimeRef.current.toFixed(2)}s)`);
+        }
+        // Forçar salvamento imediato
+        console.log('💾 Forçando salvamento ao pausar...');
+        await saveWatchTime();
       }
     };
     const handleLoadStart = () => setIsLoading(true);
@@ -567,7 +755,7 @@ export function useVideoPlayer() {
       }
     };
 
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       const video = videoRef.current;
       if (!video || !currentTrackingVideoIdRef.current) return;
 
@@ -575,17 +763,17 @@ export function useVideoPlayer() {
         // Quando a aba fica oculta, salvar o tempo até agora
         // Marcar se estava tocando para continuar contando
         wasPlayingWhenHiddenRef.current = !video.paused;
-        if (wasPlayingWhenHiddenRef.current) {
-          saveWatchTime();
+        if (wasPlayingWhenHiddenRef.current && isTrackingRef.current) {
+          await saveWatchTime();
         }
       } else {
-        // Quando volta a ficar visível, atualizar timestamp para continuar contando
+        // Quando volta a ficar visível, atualizar contadores para continuar contando
         // Se estava tocando quando perdeu foco e ainda não terminou, continuar
-        if (wasPlayingWhenHiddenRef.current && !video.ended) {
+        if (wasPlayingWhenHiddenRef.current && !video.ended && isTrackingRef.current) {
           lastWatchTimeUpdateRef.current = Date.now();
           lastVideoTimeRef.current = video.currentTime || 0;
-          // Se o vídeo foi pausado pelo navegador, não fazer nada
-          // Se ainda está tocando, continuar rastreamento
+          accumulatedWatchTimeRef.current = 0;
+          // Se o vídeo ainda está tocando, continuar rastreamento
           if (!video.paused) {
             wasPlayingWhenHiddenRef.current = true;
           }
@@ -597,7 +785,7 @@ export function useVideoPlayer() {
     // Usar um intervalo separado que verifica o currentTime do vídeo
     const backgroundWatchTimeInterval = setInterval(() => {
       const video = videoRef.current;
-      if (!video || !currentTrackingVideoIdRef.current) return;
+      if (!video || !currentTrackingVideoIdRef.current || !isTrackingRef.current) return;
 
       // Verificar se o vídeo ainda é o mesmo pela URL
       const currentUrl = video.src || video.currentSrc;
@@ -607,28 +795,25 @@ export function useVideoPlayer() {
 
       // Continuar contando mesmo se a aba não estiver focada
       // Usar o currentTime do vídeo para calcular o tempo real assistido
-      if (currentTrackingVideoIdRef.current && !video.ended && wasPlayingWhenHiddenRef.current) {
+      if (!video.ended && wasPlayingWhenHiddenRef.current && !video.paused) {
         const currentVideoTime = video.currentTime || 0;
         const timeElapsed = currentVideoTime - lastVideoTimeRef.current;
         
-        // Se o tempo do vídeo avançou, contar (mesmo que esteja pausado pelo navegador)
-        // Isso permite contar o tempo que o vídeo estava tocando antes de perder foco
+        // Se o tempo do vídeo avançou, acumular
         if (timeElapsed > 0) {
-          const now = Date.now();
-          const elapsedSeconds = (now - lastWatchTimeUpdateRef.current) / 1000;
-
-          // Atualizar a cada 10 segundos quando em background
-          if (elapsedSeconds >= 10) {
-            // Usar o tempo real do vídeo
-            incrementWatchTime(currentTrackingVideoIdRef.current, timeElapsed).catch(() => {
+          accumulatedWatchTimeRef.current += timeElapsed;
+          lastVideoTimeRef.current = currentVideoTime;
+          
+          // Salvar no banco a cada 5 segundos acumulados
+          if (accumulatedWatchTimeRef.current >= 5) {
+            const timeToSave = accumulatedWatchTimeRef.current;
+            incrementWatchTime(currentTrackingVideoIdRef.current, timeToSave).catch(() => {
               // Ignorar erros em background
             });
-            lastWatchTimeUpdateRef.current = now;
-            lastVideoTimeRef.current = currentVideoTime;
           }
         }
       }
-    }, 10000); // Verificar a cada 10 segundos quando em background
+    }, 5000); // Verificar a cada 5 segundos quando em background
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);

@@ -1,5 +1,7 @@
--- Script para permitir que administradores excluam vídeos
--- Execute este script no SQL Editor do Supabase
+-- Migration: 008_admin_delete_permission.sql
+-- Descrição: Permite que administradores excluam vídeos
+-- Data: 2024-01-XX
+-- Dependências: 002_admin_setup.sql (requer função check_user_admin e coluna is_admin)
 
 -- ============================================
 -- PARTE 1: Criar função RPC para excluir vídeo (recomendado)
@@ -57,19 +59,4 @@ USING (
         AND profiles.is_admin = TRUE
     )
 );
-
--- ============================================
--- VERIFICAÇÕES
--- ============================================
-
--- Verificar se a função foi criada
-SELECT routine_name, routine_type
-FROM information_schema.routines
-WHERE routine_schema = 'public' 
-  AND routine_name = 'delete_video';
-
--- Verificar políticas RLS
-SELECT schemaname, tablename, policyname, cmd
-FROM pg_policies 
-WHERE tablename = 'videos' AND cmd = 'DELETE';
 

@@ -1,5 +1,7 @@
--- Script para criar tabela de histórico de vídeos assistidos
--- Execute este script no SQL Editor do Supabase
+-- Migration: 005_video_history.sql
+-- Descrição: Cria tabela de histórico de vídeos assistidos
+-- Data: 2024-01-XX
+-- Dependências: Requer tabela videos e auth.users
 
 -- ============================================
 -- PARTE 1: Criar tabela de histórico

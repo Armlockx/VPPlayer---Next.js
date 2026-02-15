@@ -1,5 +1,7 @@
--- Script para criar tabela de favoritos e watchlist
--- Execute este script no SQL Editor do Supabase
+-- Migration: 007_favorites.sql
+-- Descrição: Cria tabela de favoritos e watchlist
+-- Data: 2024-01-XX
+-- Dependências: Requer tabela videos e auth.users
 
 -- ============================================
 -- PARTE 1: Criar tabela de favoritos

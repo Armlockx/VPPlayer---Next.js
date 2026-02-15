@@ -1,5 +1,8 @@
--- Script para corrigir o erro de ambiguidade na função check_user_admin
--- Execute este script no SQL Editor do Supabase
+-- Migration: 010_fix_check_user_admin.sql
+-- Descrição: Corrige erro de ambiguidade na função check_user_admin (migration de correção)
+-- Data: 2024-01-XX
+-- Dependências: 002_admin_setup.sql
+-- NOTA: Execute apenas se houver erro de ambiguidade na função check_user_admin
 
 -- Corrigir função check_user_admin removendo ambiguidade
 CREATE OR REPLACE FUNCTION check_user_admin()
@@ -27,10 +30,4 @@ $$;
 
 -- Dar permissão para executar a função
 GRANT EXECUTE ON FUNCTION check_user_admin() TO authenticated, anon, public;
-
--- Verificar se a função foi criada corretamente
-SELECT routine_name, routine_type
-FROM information_schema.routines
-WHERE routine_schema = 'public' 
-  AND routine_name = 'check_user_admin';
 

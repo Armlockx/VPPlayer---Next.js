@@ -1,5 +1,7 @@
--- Script para criar função RPC que bypassa RLS para criar perfis
--- Execute este script no SQL Editor do Supabase
+-- Migration: 003_create_profile_rpc.sql
+-- Descrição: Cria função RPC para criar/atualizar perfis (bypass RLS)
+-- Data: 2024-01-XX
+-- Dependências: 001_initial_profiles.sql (requer tabela profiles)
 
 -- ============================================
 -- PARTE 1: Criar função RPC para criar perfil
@@ -82,9 +84,4 @@ ON profiles
 FOR INSERT
 TO authenticated
 WITH CHECK (auth.uid() = id);
-
--- Verificar políticas
-SELECT policyname, cmd, roles
-FROM pg_policies
-WHERE tablename = 'profiles';
 

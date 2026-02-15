@@ -1,5 +1,7 @@
--- Script para configurar perfis de usuários e avatares
--- Execute este script no SQL Editor do Supabase
+-- Migration: 001_initial_profiles.sql
+-- Descrição: Cria tabela de perfis de usuários e configura políticas RLS
+-- Data: 2024-01-XX
+-- Dependências: Nenhuma (requer apenas auth.users do Supabase)
 
 -- ============================================
 -- PARTE 1: Criar tabela de perfis
@@ -28,6 +30,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 -- Remover políticas antigas se existirem
 DROP POLICY IF EXISTS "Todos podem ler perfis" ON profiles;
 DROP POLICY IF EXISTS "Usuários podem atualizar seu próprio perfil" ON profiles;
+DROP POLICY IF EXISTS "Usuários podem inserir seu próprio perfil" ON profiles;
 
 -- Permitir que todos leiam perfis (necessário para mostrar avatares e usernames nos comentários)
 CREATE POLICY "Todos podem ler perfis"

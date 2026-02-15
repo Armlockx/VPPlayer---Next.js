@@ -1,5 +1,7 @@
--- Script para configurar sistema de administração
--- Execute este script no SQL Editor do Supabase
+-- Migration: 002_admin_setup.sql
+-- Descrição: Configura sistema de administração (coluna is_admin e funções RPC)
+-- Data: 2024-01-XX
+-- Dependências: 001_initial_profiles.sql (requer tabela profiles)
 
 -- ============================================
 -- PARTE 1: Remover coluna admin e usar is_admin
@@ -96,44 +98,4 @@ $$;
 
 -- Dar permissão para executar a função
 GRANT EXECUTE ON FUNCTION get_user_profile() TO authenticated, anon, public;
-
--- ============================================
--- PARTE 4: Atualizar função create_user_profile para incluir is_admin
--- ============================================
-
--- A função create_user_profile já existe, mas vamos garantir que o campo is_admin seja inicializado como FALSE
--- (já está sendo feito pelo DEFAULT na coluna)
-
--- ============================================
--- PARTE 5: Criar políticas RLS para permitir que admins atualizem status admin
--- ============================================
-
--- Nota: Atualizações de status admin devem ser feitas manualmente no Supabase Dashboard
--- ou através de uma função RPC adicional com segurança apropriada
--- Por enquanto, não criaremos política RLS para permitir UPDATE de admin via cliente
--- O campo admin deve ser alterado apenas por administradores do banco de dados
-
--- ============================================
--- VERIFICAÇÕES
--- ============================================
-
--- Verificar se a coluna is_admin existe
-SELECT column_name, data_type, column_default
-FROM information_schema.columns
-WHERE table_name = 'profiles' AND column_name = 'is_admin';
-
--- Verificar se a coluna admin foi removida
-SELECT column_name
-FROM information_schema.columns
-WHERE table_name = 'profiles' AND column_name = 'admin';
-
--- Verificar funções criadas
-SELECT routine_name, routine_type
-FROM information_schema.routines
-WHERE routine_schema = 'public' 
-  AND routine_name IN ('check_user_admin', 'get_user_profile')
-ORDER BY routine_name;
-
--- Exemplo: Definir um usuário como admin (substitua 'USER_ID_AQUI' pelo ID do usuário)
--- UPDATE profiles SET is_admin = TRUE WHERE id = 'USER_ID_AQUI'::UUID;
 

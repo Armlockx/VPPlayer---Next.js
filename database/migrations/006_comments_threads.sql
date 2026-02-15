@@ -1,5 +1,7 @@
--- Script para adicionar suporte a threads (respostas) e edição de comentários
--- Execute este script no SQL Editor do Supabase
+-- Migration: 006_comments_threads.sql
+-- Descrição: Adiciona suporte a threads (respostas) e edição de comentários
+-- Data: 2024-01-XX
+-- Dependências: Requer tabela video_comments (criada manualmente ou via Supabase)
 
 -- ============================================
 -- PARTE 1: Adicionar colunas necessárias
@@ -182,12 +184,4 @@ $$;
 -- Grant de execução para as funções RPC
 GRANT EXECUTE ON FUNCTION get_video_comments_with_threads(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION get_comment_replies(UUID) TO authenticated, anon;
-
--- ============================================
--- VERIFICAÇÃO FINAL
--- ============================================
--- SELECT column_name, data_type 
--- FROM information_schema.columns 
--- WHERE table_name = 'video_comments' 
--- ORDER BY ordinal_position;
 

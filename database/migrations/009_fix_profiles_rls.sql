@@ -1,5 +1,8 @@
--- Script para corrigir políticas RLS da tabela profiles
--- Execute este script no SQL Editor do Supabase
+-- Migration: 009_fix_profiles_rls.sql
+-- Descrição: Corrige políticas RLS da tabela profiles (migration de correção)
+-- Data: 2024-01-XX
+-- Dependências: 001_initial_profiles.sql
+-- NOTA: Execute apenas se houver problemas com políticas RLS
 
 -- ============================================
 -- PARTE 1: Verificar estado atual
@@ -14,15 +17,6 @@ WHERE tablename = 'profiles';
 SELECT policyname, cmd, roles, qual, with_check
 FROM pg_policies
 WHERE tablename = 'profiles';
-
--- Verificar se há dados na tabela
-SELECT COUNT(*) AS total_profiles FROM profiles;
-
--- Listar todos os perfis
-SELECT id, username, avatar_url, email, created_at
-FROM profiles
-ORDER BY created_at DESC
-LIMIT 10;
 
 -- ============================================
 -- PARTE 2: Corrigir políticas RLS
@@ -69,7 +63,6 @@ USING (auth.uid() = id)
 WITH CHECK (auth.uid() = id);
 
 -- Permitir que usuários insiram seu próprio perfil
--- IMPORTANTE: Remover política antiga primeiro
 DROP POLICY IF EXISTS "Usuários podem inserir seu próprio perfil" ON profiles;
 
 CREATE POLICY "Usuários podem inserir seu próprio perfil"
@@ -77,24 +70,4 @@ ON profiles
 FOR INSERT
 TO authenticated
 WITH CHECK (auth.uid() = id);
-
--- Verificar se a política foi criada
-SELECT policyname, cmd, roles, with_check
-FROM pg_policies
-WHERE tablename = 'profiles' AND cmd = 'INSERT';
-
--- ============================================
--- PARTE 3: Verificar novamente
--- ============================================
-
--- Verificar políticas criadas
-SELECT policyname, cmd, roles
-FROM pg_policies
-WHERE tablename = 'profiles';
-
--- Testar se consegue ler perfis como anon
--- (Execute esta query como anon para testar)
-SELECT id, username, avatar_url
-FROM profiles
-LIMIT 5;
 
